@@ -201,7 +201,7 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
   }
 
   if (error) {
-    return (
+  return (
       <div className="flex-1 overflow-y-auto bg-[var(--color-background)] text-[var(--color-text-primary)]">
         <ErrorMessage message={error} onRetry={fetchData} />
       </div>
@@ -218,21 +218,21 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           ) : recentlyPlayed.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
               {recentlyPlayed.map((item) => (
-                <MusicCard
+              <MusicCard 
                   key={item.id}
                   title={item.songTitle}
                   artist={item.artistName}
                   image="https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png"
-                  onPlay={() => handlePlayTrack(item)}
-                />
+                onPlay={() => handlePlayTrack(item)}
+              />
               ))}
             </div>
           ) : (
             <div className="text-center text-[var(--color-text-secondary)]">
               No recently played songs
-            </div>
+        </div>
           )}
-        </section>
+      </section>
 
         <section className="mb-8">
           <h2 className="text-2xl font-bold mb-6">Made For You</h2>
@@ -241,21 +241,21 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           ) : madeForYou.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
               {madeForYou.map((item) => (
-                <MusicCard
+            <MusicCard 
                   key={item.id}
-                  title={item.title}
+              title={item.title} 
                   artist={item.description || 'Custom Mix'}
                   image={item.coverImage || "https://v3.fal.media/files/kangaroo/HRayeBi01JIqfkCjjoenp_output.png"}
-                  onPlay={() => handlePlayTrack(item)}
-                />
-              ))}
-            </div>
+              onPlay={() => handlePlayTrack(item)}
+            />
+          ))}
+        </div>
           ) : (
             <div className="text-center text-[var(--color-text-secondary)]">
               No personalized playlists available
             </div>
           )}
-        </section>
+      </section>
 
         <section className="mb-8">
           <h2 className="text-2xl font-bold mb-6">Popular Albums</h2>
@@ -264,21 +264,21 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           ) : popularAlbums.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
               {popularAlbums.map((item) => (
-                <MusicCard
+            <MusicCard 
                   key={item.id}
-                  title={item.title}
-                  artist={item.artist}
+              title={item.title} 
+              artist={item.artist}
                   image={item.coverImage || "https://v3.fal.media/files/elephant/C_rLsEbIUdbn6nQ0wz14S_output.png"}
-                  onPlay={() => handlePlayTrack(item)}
-                />
-              ))}
-            </div>
+              onPlay={() => handlePlayTrack(item)}
+            />
+          ))}
+        </div>
           ) : (
             <div className="text-center text-[var(--color-text-secondary)]">
               No popular albums available
             </div>
           )}
-        </section>
+      </section>
       </div>
     </div>
   )
