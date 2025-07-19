@@ -11,7 +11,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load environment variables from root .env file
-dotenv.config({ path: join(__dirname, '../..', '.env') });
+const envPath = join(__dirname, '../..', '.env');
+console.log(chalk.blue('📁 Loading environment from:', envPath));
+dotenv.config({ path: envPath });
+
+if (!process.env.OPENAI_API_KEY) {
+  console.error(chalk.red('❌ Error: OPENAI_API_KEY is not set in .env file'));
+  process.exit(1);
+}
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -41,6 +48,13 @@ program
       console.log(chalk.green('✨ Query processing completed!'));
     } catch (error) {
       console.error(chalk.red('Error processing query:'), error);
+      if (error instanceof Error) {
+        console.error(chalk.red('Error details:'), {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
       process.exit(1);
     }
   });

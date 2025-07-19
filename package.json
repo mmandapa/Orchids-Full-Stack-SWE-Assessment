@@ -10,7 +10,8 @@
     "lint": "next lint",
     "db:push": "drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
-    "db:agent": "node --loader ts-node/esm cli/src/index.ts query"
+    "db:agent": "NODE_OPTIONS='--loader ts-node/esm' ts-node --project cli/tsconfig.json cli/src/index.ts query",
+    "db:migrate": "psql -d spotify_clone -f db/migrations/0000_init.sql"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",

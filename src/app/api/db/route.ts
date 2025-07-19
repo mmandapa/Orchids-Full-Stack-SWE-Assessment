@@ -1,82 +1,105 @@
 import { NextResponse } from 'next/server';
-import { db, schema } from '@/lib/db';
-import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { desc } from 'drizzle-orm';
+import { recentlyPlayed, madeForYou, popularAlbums } from '../../../../db/schema';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const table = searchParams.get('table');
-    const userId = searchParams.get('userId');
-
-    if (!table) {
-      return NextResponse.json({ error: 'Table parameter is required' }, { status: 400 });
-    }
+    const table = searchParams.get('table') || 'recently_played';
 
     let data;
     switch (table) {
       case 'recently_played':
-        data = await db.query.recentlyPlayed.findMany({
-          where: userId ? eq(schema.recentlyPlayed.userId, parseInt(userId)) : undefined,
-          orderBy: (fields) => [fields.playedAt.desc()],
-          limit: 50,
-        });
+        data = await db
+          .select()
+          .from(recentlyPlayed)
+          .orderBy(desc(recentlyPlayed.playedAt))
+          .limit(10);
         break;
 
       case 'made_for_you':
-        data = await db.query.madeForYou.findMany({
-          where: userId ? eq(schema.madeForYou.userId, parseInt(userId)) : undefined,
-          orderBy: (fields) => [fields.createdAt.desc()],
-        });
+        data = await db
+          .select()
+          .from(madeForYou)
+          .orderBy(desc(madeForYou.createdAt))
+          .limit(10);
         break;
 
       case 'popular_albums':
-        data = await db.query.popularAlbums.findMany({
-          orderBy: (fields) => [fields.popularity.desc()],
-          limit: 20,
-        });
+        data = await db
+          .select()
+          .from(popularAlbums)
+          .orderBy(desc(popularAlbums.popularity))
+          .limit(10);
         break;
 
       default:
-        return NextResponse.json({ error: 'Invalid table parameter' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid table parameter' },
+          { status: 400 }
+        );
     }
 
     return NextResponse.json({ data });
   } catch (error) {
-    console.error('Database error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error fetching data:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch data' },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { table, data } = body;
+    const { table, data } = await request.json();
 
-    if (!table || !data) {
-      return NextResponse.json({ error: 'Table and data parameters are required' }, { status: 400 });
-    }
-
-    let result;
     switch (table) {
       case 'recently_played':
-        result = await db.insert(schema.recentlyPlayed).values(data);
+        await db.insert(recentlyPlayed).values({
+          songTitle: data.songTitle,
+          artistName: data.artistName,
+          playedAt: new Date()
+        });
         break;
 
       case 'made_for_you':
-        result = await db.insert(schema.madeForYou).values(data);
+        await db.insert(madeForYou).values({
+          userId: data.userId,
+          playlistId: data.playlistId,
+          title: data.title,
+          description: data.description,
+          coverImage: data.coverImage,
+          createdAt: new Date()
+        });
         break;
 
       case 'popular_albums':
-        result = await db.insert(schema.popularAlbums).values(data);
+        await db.insert(popularAlbums).values({
+          title: data.title,
+          artist: data.artist,
+          coverImage: data.coverImage,
+          releaseDate: new Date(data.releaseDate),
+          totalTracks: data.totalTracks,
+          popularity: data.popularity,
+          createdAt: new Date()
+        });
         break;
 
       default:
-        return NextResponse.json({ error: 'Invalid table parameter' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid table parameter' },
+          { status: 400 }
+        );
     }
 
-    return NextResponse.json({ success: true, result });
+    return NextResponse.json({ message: 'Data added successfully' });
   } catch (error) {
-    console.error('Database error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error adding data:', error);
+    return NextResponse.json(
+      { error: 'Failed to add data' },
+      { status: 500 }
+    );
   }
-} 
+}

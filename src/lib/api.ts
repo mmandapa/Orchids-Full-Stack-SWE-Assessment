@@ -29,54 +29,105 @@ export interface PopularAlbum {
 
 // API functions
 export async function fetchRecentlyPlayed(userId?: number): Promise<RecentlyPlayed[]> {
-  const params = new URLSearchParams({ table: 'recently_played' });
-  if (userId) params.append('userId', userId.toString());
-  
-  const response = await fetch(`/api/db?${params}`);
-  const { data } = await response.json();
-  return data;
+  try {
+    const params = new URLSearchParams({ table: 'recently_played' });
+    if (userId) params.append('userId', userId.toString());
+    
+    const response = await fetch(`/api/db?${params}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const { data, error } = await response.json();
+    if (error) throw new Error(error);
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching recently played:', error);
+    return [];
+  }
 }
 
 export async function fetchMadeForYou(userId?: number): Promise<MadeForYou[]> {
-  const params = new URLSearchParams({ table: 'made_for_you' });
-  if (userId) params.append('userId', userId.toString());
-  
-  const response = await fetch(`/api/db?${params}`);
-  const { data } = await response.json();
-  return data;
+  try {
+    const params = new URLSearchParams({ table: 'made_for_you' });
+    if (userId) params.append('userId', userId.toString());
+    
+    const response = await fetch(`/api/db?${params}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const { data, error } = await response.json();
+    if (error) throw new Error(error);
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching made for you:', error);
+    return [];
+  }
 }
 
 export async function fetchPopularAlbums(): Promise<PopularAlbum[]> {
-  const params = new URLSearchParams({ table: 'popular_albums' });
-  
-  const response = await fetch(`/api/db?${params}`);
-  const { data } = await response.json();
-  return data;
+  try {
+    const params = new URLSearchParams({ table: 'popular_albums' });
+    
+    const response = await fetch(`/api/db?${params}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const { data, error } = await response.json();
+    if (error) throw new Error(error);
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching popular albums:', error);
+    return [];
+  }
 }
 
 export async function addRecentlyPlayed(data: Omit<RecentlyPlayed, 'id' | 'playedAt'>) {
-  const response = await fetch('/api/db', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ table: 'recently_played', data }),
-  });
-  return response.json();
+  try {
+    const response = await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table: 'recently_played', data }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Error adding recently played:', error);
+    throw error;
+  }
 }
 
 export async function addMadeForYou(data: Omit<MadeForYou, 'id' | 'createdAt'>) {
-  const response = await fetch('/api/db', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ table: 'made_for_you', data }),
-  });
-  return response.json();
+  try {
+    const response = await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table: 'made_for_you', data }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Error adding made for you:', error);
+    throw error;
+  }
 }
 
 export async function addPopularAlbum(data: Omit<PopularAlbum, 'id' | 'createdAt'>) {
-  const response = await fetch('/api/db', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ table: 'popular_albums', data }),
-  });
-  return response.json();
+  try {
+    const response = await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table: 'popular_albums', data }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Error adding popular album:', error);
+    throw error;
+  }
 } 
