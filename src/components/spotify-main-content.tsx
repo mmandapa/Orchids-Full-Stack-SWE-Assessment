@@ -1,7 +1,9 @@
 "use client"
 
 import { Play, User } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { fetchRecentlyPlayed, fetchMadeForYou, fetchPopularAlbums } from "@/lib/api"
+import type { RecentlyPlayed, MadeForYou, PopularAlbum } from "@/lib/api"
 
 interface Track {
   id: string
@@ -80,174 +82,32 @@ interface SpotifyMainContentProps {
 }
 
 export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentProps) {
-  const recentlyPlayed = [
-    { 
-      id: "1",
-      title: "Liked Songs", 
-      artist: "320 songs",
-      album: "Your Music",
-      image: "https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png",
-      duration: 180
-    },
-    { 
-      id: "2",
-      title: "Discover Weekly", 
-      artist: "Spotify",
-      album: "Weekly Mix",
-      image: "https://v3.fal.media/files/kangaroo/HRayeBi01JIqfkCjjoenp_output.png",
-      duration: 210
-    },
-    { 
-      id: "3",
-      title: "Release Radar", 
-      artist: "Spotify",
-      album: "New Releases",
-      image: "https://v3.fal.media/files/panda/q7hWJCgH2Fy4cJdWqAzuk_output.png",
-      duration: 195
-    },
-    { 
-      id: "4",
-      title: "Daily Mix 1", 
-      artist: "Spotify",
-      album: "Daily Mix",
-      image: "https://v3.fal.media/files/elephant/N5qDbXOpqAlIcK7kJ4BBp_output.png",
-      duration: 225
-    },
-    { 
-      id: "5",
-      title: "Chill Hits", 
-      artist: "Spotify",
-      album: "Chill Collection",
-      image: "https://v3.fal.media/files/rabbit/tAQ6AzJJdlEZW-y4eNdxO_output.png",
-      duration: 240
-    },
-    { 
-      id: "6",
-      title: "Top 50 - Global", 
-      artist: "Spotify",
-      album: "Global Charts",
-      image: "https://v3.fal.media/files/kangaroo/0OgdfDAzLEbkda0m7uLJw_output.png",
-      duration: 205
-    }
-  ]
+  const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayed[]>([])
+  const [madeForYou, setMadeForYou] = useState<MadeForYou[]>([])
+  const [popularAlbums, setPopularAlbums] = useState<PopularAlbum[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const madeForYou = [
-    { 
-      id: "7",
-      title: "Discover Weekly", 
-      artist: "Your weekly mixtape of fresh music",
-      album: "Weekly Discovery",
-      image: "https://v3.fal.media/files/kangaroo/HRayeBi01JIqfkCjjoenp_output.png",
-      duration: 210
-    },
-    { 
-      id: "8",
-      title: "Release Radar", 
-      artist: "Catch all the latest music from artists you follow",
-      album: "New Music Friday",
-      image: "https://v3.fal.media/files/panda/q7hWJCgH2Fy4cJdWqAzuk_output.png",
-      duration: 195
-    },
-    { 
-      id: "9",
-      title: "Daily Mix 1", 
-      artist: "Billie Eilish, Lorde, Clairo and more",
-      album: "Alternative Mix",
-      image: "https://v3.fal.media/files/elephant/N5qDbXOpqAlIcK7kJ4BBp_output.png",
-      duration: 225
-    },
-    { 
-      id: "10",
-      title: "Daily Mix 2", 
-      artist: "Arctic Monkeys, The Strokes, Tame Impala and more",
-      album: "Indie Rock Mix",
-      image: "https://v3.fal.media/files/rabbit/tAQ6AzJJdlEZW-y4eNdxO_output.png",
-      duration: 240
-    },
-    { 
-      id: "11",
-      title: "Daily Mix 3", 
-      artist: "Taylor Swift, Olivia Rodrigo, Gracie Abrams and more",
-      album: "Pop Mix",
-      image: "https://v3.fal.media/files/rabbit/b11V_uidRMsa2mTr5mCfz_output.png",
-      duration: 190
-    },
-    { 
-      id: "12",
-      title: "On Repeat", 
-      artist: "The songs you can't get enough of",
-      album: "Your Favorites",
-      image: "https://v3.fal.media/files/rabbit/mVegWQYIe0yj8NixTQQG-_output.png",
-      duration: 220
-    }
-  ]
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [recentlyPlayedData, madeForYouData, popularAlbumsData] = await Promise.all([
+          fetchRecentlyPlayed(1), // Hardcoded user ID for demo
+          fetchMadeForYou(1),     // Hardcoded user ID for demo
+          fetchPopularAlbums()
+        ]);
 
-  const popularAlbums = [
-    { 
-      id: "13",
-      title: "Midnights", 
-      artist: "Taylor Swift",
-      album: "Midnights",
-      image: "https://v3.fal.media/files/elephant/C_rLsEbIUdbn6nQ0wz14S_output.png",
-      duration: 275
-    },
-    { 
-      id: "14",
-      title: "Harry's House", 
-      artist: "Harry Styles",
-      album: "Harry's House",
-      image: "https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png",
-      duration: 245
-    },
-    { 
-      id: "15",
-      title: "Un Verano Sin Ti", 
-      artist: "Bad Bunny",
-      album: "Un Verano Sin Ti",
-      image: "https://v3.fal.media/files/kangaroo/HRayeBi01JIqfkCjjoenp_output.png",
-      duration: 265
-    },
-    { 
-      id: "16",
-      title: "Renaissance", 
-      artist: "Beyoncé",
-      album: "Renaissance",
-      image: "https://v3.fal.media/files/elephant/N5qDbXOpqAlIcK7kJ4BBp_output.png",
-      duration: 290
-    },
-    { 
-      id: "17",
-      title: "SOUR", 
-      artist: "Olivia Rodrigo",
-      album: "SOUR",
-      image: "https://v3.fal.media/files/rabbit/tAQ6AzJJdlEZW-y4eNdxO_output.png",
-      duration: 215
-    },
-    { 
-      id: "18",
-      title: "Folklore", 
-      artist: "Taylor Swift",
-      album: "Folklore",
-      image: "https://v3.fal.media/files/rabbit/b11V_uidRMsa2mTr5mCfz_output.png",
-      duration: 285
-    },
-    { 
-      id: "19",
-      title: "Fine Line", 
-      artist: "Harry Styles",
-      album: "Fine Line",
-      image: "https://v3.fal.media/files/panda/q7hWJCgH2Fy4cJdWqAzuk_output.png",
-      duration: 255
-    },
-    { 
-      id: "20",
-      title: "After Hours", 
-      artist: "The Weeknd",
-      album: "After Hours",
-      image: "https://v3.fal.media/files/kangaroo/0OgdfDAzLEbkda0m7uLJw_output.png",
-      duration: 270
+        setRecentlyPlayed(recentlyPlayedData);
+        setMadeForYou(madeForYouData);
+        setPopularAlbums(popularAlbumsData);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
     }
-  ]
+
+    fetchData();
+  }, []);
 
   const handlePlayTrack = (item: any) => {
     const track: Track = {
@@ -262,97 +122,61 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
   }
 
   return (
-    <div className="bg-[var(--color-background-primary)] text-[var(--color-text-primary)] min-h-screen">
-      {/* Header */}
-      <div className="flex items-center justify-between p-6 pb-0">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">Good afternoon</h1>
-        </div>
-        <div className="w-8 h-8 bg-[var(--color-muted)] rounded-full flex items-center justify-center">
-          <User className="w-4 h-4 text-[var(--color-text-secondary)]" />
-        </div>
+    <div className="flex-1 overflow-y-auto bg-[var(--color-background)] text-[var(--color-text-primary)]">
+      <div className="p-6">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-lg text-[var(--color-text-secondary)]">Loading...</div>
+          </div>
+        ) : (
+          <>
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold mb-6">Recently Played</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                {recentlyPlayed.map((item) => (
+                  <MusicCard
+                    key={item.id}
+                    title={`Song ${item.songId}`}
+                    artist={`User ${item.userId}`}
+                    image="https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png"
+                    onPlay={() => handlePlayTrack(item)}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold mb-6">Made For You</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                {madeForYou.map((item) => (
+                  <MusicCard
+                    key={item.id}
+                    title={item.title}
+                    artist={item.description || 'Custom Mix'}
+                    image={item.coverImage || "https://v3.fal.media/files/kangaroo/HRayeBi01JIqfkCjjoenp_output.png"}
+                    onPlay={() => handlePlayTrack(item)}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-bold mb-6">Popular Albums</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                {popularAlbums.map((item) => (
+                  <MusicCard
+                    key={item.id}
+                    title={item.title}
+                    artist={item.artist}
+                    image={item.coverImage || "https://v3.fal.media/files/elephant/C_rLsEbIUdbn6nQ0wz14S_output.png"}
+                    onPlay={() => handlePlayTrack(item)}
+                  />
+                ))}
+              </div>
+            </section>
+          </>
+        )}
       </div>
-
-      {/* Recently Played */}
-      <section className="px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Recently played</h2>
-        </div>
-        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-          {recentlyPlayed.map((item, index) => (
-            <div key={index} className="flex-shrink-0">
-              <MusicCard 
-                title={item.title} 
-                artist={item.artist} 
-                image={item.image}
-                size="small"
-                onPlay={() => handlePlayTrack(item)}
-              />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Made For You */}
-      <section className="px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Made For You</h2>
-          <button className="text-[var(--color-text-secondary)] text-sm font-medium hover:text-[var(--color-text-primary)] transition-colors">
-            Show all
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-          {madeForYou.map((item, index) => (
-            <MusicCard 
-              key={index}
-              title={item.title} 
-              artist={item.artist}
-              image={item.image}
-              size="medium"
-              onPlay={() => handlePlayTrack(item)}
-            />
-          ))}
-        </div>
-      </section>
-
-      {/* Popular Albums */}
-      <section className="px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Popular albums</h2>
-          <button className="text-[var(--color-text-secondary)] text-sm font-medium hover:text-[var(--color-text-primary)] transition-colors">
-            Show all
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
-          {popularAlbums.map((item, index) => (
-            <MusicCard 
-              key={index}
-              title={item.title} 
-              artist={item.artist}
-              image={item.image}
-              size="medium"
-              onPlay={() => handlePlayTrack(item)}
-            />
-          ))}
-        </div>
-      </section>
-
-      <style jsx>{`
-        .scrollbar-hide {
-          /* Hide scrollbar for Chrome, Safari and Opera */
-          -webkit-scrollbar: hidden;
-        }
-        
-        .scrollbar-hide {
-          /* Hide scrollbar for IE, Edge and Firefox */
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
     </div>
   )
 }
