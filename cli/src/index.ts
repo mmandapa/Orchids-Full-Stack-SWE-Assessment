@@ -8,6 +8,10 @@ import { dirname, join } from 'path';
 import { processQuery } from './agent.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import inquirer from 'inquirer';
+import readline from 'readline';
+import figlet from 'figlet';
+import gradient from 'gradient-string';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,7 +19,6 @@ const execAsync = promisify(exec);
 
 // Load environment variables from root .env file
 const envPath = join(__dirname, '../..', '.env');
-console.log(chalk.blue('📁 Loading environment from:', envPath));
 dotenv.config({ path: envPath });
 
 if (!process.env.OPENAI_API_KEY) {
@@ -27,6 +30,32 @@ if (!process.env.OPENAI_API_KEY) {
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Function to display Claude-like logo
+function displayLogo() {
+  console.clear();
+  const logo = figlet.textSync('DB-AGENT', {
+    font: 'Big',
+    horizontalLayout: 'default',
+    verticalLayout: 'default',
+    width: 80,
+    whitespaceBreak: true
+  });
+  
+  console.log(gradient.rainbow(logo));
+  console.log(chalk.cyan.dim('(by orchids)'));
+  console.log('');
+  console.log(chalk.blue.bold('Database Agent'));
+  console.log(chalk.dim('AI-powered database operations for Spotify clone'));
+  console.log(chalk.dim('─'.repeat(80)));
+  console.log(chalk.yellow('Keyboard shortcuts:'));
+  console.log(chalk.dim('  Arrow keys: Navigate options'));
+  console.log(chalk.dim('  Type: Search options'));
+  console.log(chalk.dim('  Enter: Select option'));
+  console.log(chalk.dim('  Ctrl+C: Exit anytime'));
+  console.log(chalk.dim('─'.repeat(80)));
+  console.log('');
+}
 
 // Function to get all tables
 async function getAllTables(): Promise<string[]> {
@@ -44,7 +73,7 @@ async function getAllTables(): Promise<string[]> {
     
     return tables.filter(table => table.length > 0);
   } catch (error) {
-    console.error(chalk.red('❌ Error getting tables:'), error);
+    console.error(chalk.red('Error getting tables:'), error);
     return [];
   }
 }
@@ -52,7 +81,7 @@ async function getAllTables(): Promise<string[]> {
 // Function to view table data
 async function viewTable(tableName: string, limit: number = 10) {
   try {
-    console.log(chalk.blue(`📊 Viewing table: ${tableName}`));
+    console.log(chalk.blue(`Viewing table: ${tableName}`));
     console.log(chalk.dim('─'.repeat(50)));
     
     const { stdout } = await execAsync(`psql -d spotify_clone -c "SELECT * FROM "${tableName}" LIMIT ${limit};"`);
@@ -76,9 +105,9 @@ async function viewTable(tableName: string, limit: number = 10) {
       }
     }
     
-    console.log(chalk.green(`✅ Displayed up to ${limit} rows from ${tableName}`));
+    console.log(chalk.green(`Displayed up to ${limit} rows from ${tableName}`));
   } catch (error) {
-    console.error(chalk.red(`❌ Error viewing table ${tableName}:`), error);
+    console.error(chalk.red(`Error viewing table ${tableName}:`), error);
   }
 }
 
@@ -123,36 +152,234 @@ function showAvailableCommands() {
   });
 }
 
+// Function to create interactive menu
+async function createInteractiveMenu() {
+  const choices = [
+    {
+      name: 'List all database tables',
+      value: 'tables',
+      description: 'Show all available tables in the database'
+    },
+    {
+      name: 'View table data',
+      value: 'view',
+      description: 'Display data from a specific table'
+    },
+    {
+      name: 'Process AI query',
+      value: 'query',
+      description: 'Ask AI to perform database operations'
+    },
+    {
+      name: 'Show help',
+      value: 'help',
+      description: 'Display detailed help and examples'
+    },
+    {
+      name: 'Exit (Ctrl+C)',
+      value: 'exit',
+      description: 'Close the application'
+    }
+  ];
+
+  const { action } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'action',
+      message: 'What would you like to do? (Use arrow keys or type to search)',
+      choices: choices,
+      pageSize: 10
+    }
+  ]);
+
+  return action;
+}
+
+// Function to handle table selection
+async function selectTable(): Promise<string> {
+  const tables = await getAllTables();
+  
+  if (tables.length === 0) {
+    console.log(chalk.yellow('⚠️ No tables found or database connection failed'));
+    return '';
+  }
+
+  const { selectedTable } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'selectedTable',
+      message: 'Select a table to view:',
+      choices: tables.map(table => ({
+        name: table,
+        value: table
+      }))
+    }
+  ]);
+
+  return selectedTable;
+}
+
+// Function to get query input
+async function getQueryInput(): Promise<string> {
+  const { query } = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'query',
+      message: 'Enter your database query:',
+      validate: (input: string) => {
+        if (input.trim().length === 0) {
+          return 'Please enter a query';
+        }
+        return true;
+      }
+    }
+  ]);
+
+  return query;
+}
+
+// Function to get table view limit
+async function getTableLimit(): Promise<number> {
+  const { limit } = await inquirer.prompt([
+    {
+      type: 'number',
+      name: 'limit',
+      message: 'How many rows to display?',
+      default: 10,
+      validate: (input: any) => {
+        const num = Number(input);
+        if (isNaN(num) || num < 1 || num > 100) {
+          return 'Please enter a number between 1 and 100';
+        }
+        return true;
+      }
+    }
+  ]);
+
+  return Number(limit);
+}
+
 // Function to run interactive mode
 async function runInteractiveMode() {
-  console.log(chalk.blue('🤖 Database Agent - Interactive Mode'));
-  console.log(chalk.dim('─'.repeat(50)));
+  displayLogo();
   
-  showAvailableCommands();
-  
-  console.log(chalk.blue('💡 Interactive Commands:'));
-  console.log(chalk.dim('─'.repeat(50)));
-  
-  const interactiveCommands = [
-    { key: '1', action: 'List all tables', command: 'tables' },
-    { key: '2', action: 'View table data', command: 'view <table>' },
-    { key: '3', action: 'Process AI query', command: 'query <your question>' },
-    { key: '4', action: 'Show this help', command: 'help' },
-    { key: 'q', action: 'Quit', command: 'quit' }
-  ];
-  
-  interactiveCommands.forEach(cmd => {
-    console.log(chalk.yellow(`${cmd.key}. ${cmd.action}`));
-    console.log(chalk.dim(`   Command: ${cmd.command}`));
-  });
-  
-  console.log(chalk.dim('─'.repeat(50)));
-  console.log(chalk.blue('🎯 Enter a command or number:'));
-  
-  // For now, we'll just show the available options
-  // In a full implementation, you'd use a library like inquirer for true interactivity
-  console.log(chalk.green('✅ Interactive mode ready! Use the commands above.'));
-  console.log(chalk.dim('💡 Tip: Use "db-agent query <your question>" for AI-powered database operations'));
+  while (true) {
+    try {
+      const action = await createInteractiveMenu();
+      
+      switch (action) {
+        case 'tables':
+          console.log(chalk.blue('Available Database Tables:'));
+          console.log(chalk.dim('─'.repeat(50)));
+          
+          const tables = await getAllTables();
+          
+          if (tables.length === 0) {
+            console.log(chalk.yellow('No tables found or database connection failed'));
+          } else {
+            tables.forEach((table, index) => {
+              console.log(chalk.green(`${index + 1}. ${table}`));
+            });
+            
+            console.log(chalk.dim('─'.repeat(50)));
+            console.log(chalk.blue(`Total tables: ${tables.length}`));
+          }
+          break;
+          
+        case 'view':
+          const selectedTable = await selectTable();
+          if (selectedTable) {
+            const limit = await getTableLimit();
+            await viewTable(selectedTable, limit);
+          }
+          break;
+          
+        case 'query':
+          const query = await getQueryInput();
+          console.log(chalk.blue('Database Agent: Processing your query...'));
+          console.log(chalk.dim(`Query: ${query}`));
+          
+          await processQuery(query, openai);
+          console.log(chalk.green('Query processing completed!'));
+          break;
+          
+        case 'help':
+          console.log(chalk.blue('Database Agent - Help'));
+          console.log(chalk.dim('─'.repeat(50)));
+          
+          showAvailableCommands();
+          
+          console.log(chalk.blue('Common Use Cases:'));
+          console.log(chalk.dim('─'.repeat(50)));
+          
+          const useCases = [
+            {
+              scenario: 'Add data to database',
+              command: 'db-agent query "Add a new song called \'New Song\' by \'New Artist\' to recently played"',
+              description: 'AI will create the appropriate SQL and execute it'
+            },
+            {
+              scenario: 'Create backup tables',
+              command: 'db-agent query "Create a backup of the popular_albums table"',
+              description: 'AI will create a new table with the same structure and data'
+            },
+            {
+              scenario: 'View table structure',
+              command: 'db-agent view recently_played',
+              description: 'See the actual data in a table'
+            },
+            {
+              scenario: 'List all tables',
+              command: 'db-agent tables',
+              description: 'See what tables exist in the database'
+            }
+          ];
+          
+          useCases.forEach((useCase, index) => {
+            console.log(chalk.yellow(`${index + 1}. ${useCase.scenario}`));
+            console.log(chalk.green(`   Command: ${useCase.command}`));
+            console.log(chalk.dim(`   ${useCase.description}`));
+            console.log('');
+          });
+          break;
+          
+        case 'exit':
+          console.log(chalk.blue('Goodbye!'));
+          process.exit(0);
+          break;
+      }
+      
+      console.log('');
+      console.log(chalk.dim('Press Enter to continue...'));
+      await new Promise(resolve => {
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+        rl.question('', () => {
+          rl.close();
+          resolve(undefined);
+        });
+      });
+      
+      displayLogo();
+      
+    } catch (error) {
+      console.error(chalk.red('Error:'), error);
+      console.log(chalk.dim('Press Enter to continue...'));
+      await new Promise(resolve => {
+        const rl = readline.createInterface({
+          input: process.stdin,
+          output: process.stdout
+        });
+        rl.question('', () => {
+          rl.close();
+          resolve(undefined);
+        });
+      });
+      displayLogo();
+    }
+  }
 }
 
 // Create CLI program
