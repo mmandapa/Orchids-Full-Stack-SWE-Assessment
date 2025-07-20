@@ -1,23 +1,17 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import { recentlyPlayed, madeForYou, popularAlbums } from '../../../db/schema';
+interface RecentlyPlayedEntry {
+    userId: number;
+    songId: number;
+}
 
-// Create postgres client
-const client = postgres(process.env.DATABASE_URL || 'postgres://maharshi12@localhost:5432/spotify_clone');
-
-// Create drizzle database instance
-export const db = drizzle(client);
-
-// Helper function for adding recently played songs
-export async function addRecentlyPlayedSong(songTitle: string, artistName: string): Promise<void> {
+async function addRecentlyPlayedSong(entry: RecentlyPlayedEntry): Promise<void> {
     try {
-        await db.insert(recentlyPlayed).values({
-            songTitle,
-            artistName,
-            playedAt: new Date()
-        });
+        const query = `
+            INSERT INTO recently_played (user_id, song_id, played_at)
+            VALUES ($1, $2, NOW())
+        `;
+        const values = [entry.userId, entry.songId];
+        await db.query(query, values);
     } catch (error) {
-        console.error(`Error adding song to recently played: ${error}`);
-        throw error;
+        console.error(`Error adding recently played song: ${error}`);
     }
 }

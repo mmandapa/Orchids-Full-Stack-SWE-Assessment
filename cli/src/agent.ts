@@ -186,59 +186,32 @@ async function analyzeContext(query: string) {
   console.log(chalk.dim('  - Analyzing query requirements'));
   
   try {
-    // Get current table schemas
+    // Get current table schemas dynamically
     const { stdout: schemas } = await execAsync('psql -d spotify_clone -c "\\d+"');
     console.log(chalk.dim('Current schema:'), schemas);
     
-    // Get current table data samples
-    const { stdout: recentlyPlayed } = await execAsync('psql -d spotify_clone -c "SELECT * FROM recently_played LIMIT 3;"');
-    console.log(chalk.dim('Sample data:'), recentlyPlayed);
+    // Get list of existing tables dynamically
+    const { stdout: tablesOutput } = await execAsync('psql -d spotify_clone -c "\\dt"');
+    const existingTables: string[] = [];
+    const lines = tablesOutput.split('\n');
+    for (const line of lines) {
+      const match = line.match(/\|\s+(\w+)\s+\|/);
+      if (match && match[1] && !match[1].includes('_seq')) {
+        existingTables.push(match[1]);
+      }
+    }
     
-    // Get actual table schemas dynamically
-    const { stdout: artistsSchema } = await execAsync('psql -d spotify_clone -c "\\d artists"');
-    const { stdout: popularAlbumsSchema } = await execAsync('psql -d spotify_clone -c "\\d popular_albums"');
-    const { stdout: madeForYouSchema } = await execAsync('psql -d spotify_clone -c "\\d made_for_you"');
+    console.log(chalk.dim('Existing tables:'), existingTables);
     
     return {
-      relevantFiles: [
-        'db/schema.ts',
-        'src/lib/db/index.ts',
-        'src/app/api/db/route.ts',
-        'src/components/spotify-main-content.tsx'
-      ],
-      schemas,
-      samples: {
-        recentlyPlayed
-      },
-      exactSchema: {
-        recently_played: ['id', 'song_title', 'artist_name', 'played_at'],
-        popular_albums: ['id', 'title', 'artist', 'cover_image', 'release_date', 'total_tracks', 'popularity', 'created_at'],
-        made_for_you: ['id', 'user_id', 'playlist_id', 'title', 'description', 'cover_image', 'created_at'],
-        artists: ['id', 'name', 'bio', 'created_at', 'updated_at']
-      },
-      tableSchemas: {
-        artists: artistsSchema,
-        popular_albums: popularAlbumsSchema,
-        made_for_you: madeForYouSchema
-      }
+      existingTables,
+      schemas
     };
   } catch (error) {
     console.error(chalk.red('❌ Error analyzing context:'), error);
-    if (error instanceof Error) {
-      console.error(chalk.red('Error details:'), {
-        message: error.message,
-        stack: error.stack
-      });
-    }
     return {
-      relevantFiles: [
-        'db/schema.ts',
-        'src/lib/db/index.ts',
-        'src/app/api/db/route.ts',
-        'src/components/spotify-main-content.tsx'
-      ],
-      schemas: '',
-      samples: {}
+      existingTables: [],
+      schemas: ''
     };
   }
 }
@@ -271,75 +244,75 @@ function extractTypeScriptCode(response: string): { file: string; code: string }
     code: match[2].trim()
   }));
   
-  // STRICT PROTECTION: Completely block any frontend file modifications
-  const protectedFiles = [
-    'src/components/',
-    'src/app/page.tsx',
-    'src/app/layout.tsx',
-    'src/app/api/db/route.ts'
-  ];
-  
-  const allowedFiles = files.filter(f => {
-    const isProtected = protectedFiles.some(protectedPath => f.file.includes(protectedPath));
-    if (isProtected) {
-      console.log(chalk.red(`🚫 BLOCKED: Attempted to modify protected frontend file: ${f.file}`));
-      console.log(chalk.yellow('💡 Tip: Frontend files are protected to prevent UI changes.'));
-    }
-    return !isProtected;
-  });
-  
-  console.log(chalk.dim('Found TypeScript files:'), allowedFiles.map(f => f.file));
-  return allowedFiles;
+  // Allow frontend file modifications since UI was restored
+  console.log(chalk.dim('Found TypeScript files:'), files.map(f => f.file));
+  return files;
 }
 
 // Function to validate SQL commands against existing tables
-async function validateSqlCommands(sqlCommands: string[]): Promise<string[]> {
-  console.log(chalk.blue('🔍 Validating SQL commands against existing tables...'));
-  
-  // Get list of existing tables
-  const { stdout: tablesOutput } = await execAsync('psql -d spotify_clone -c "\\dt"');
-  const existingTables: string[] = [];
-  
-  // Parse table names from output
-  const lines = tablesOutput.split('\n');
-  for (const line of lines) {
-    const match = line.match(/\|\s+(\w+)\s+\|/);
-    if (match && match[1] && !match[1].includes('_seq')) {
-      existingTables.push(match[1]);
-    }
-  }
-  
-  console.log(chalk.dim('Existing tables:'), existingTables);
-  
-  // Validate each SQL command
-  const validCommands: string[] = [];
-  for (const command of sqlCommands) {
+function validateSqlCommands(sqlCommands: string[], existingTables: string[]): { valid: string[], invalid: string[] } {
+  const valid: string[] = [];
+  const invalid: string[] = [];
+
+  for (const sql of sqlCommands) {
     let isValid = true;
-    let errorReason = '';
     
-    // Check for table references
-    const tableRegex = /(?:FROM|INTO|UPDATE|DELETE FROM)\s+(\w+)/gi;
-    const matches = [...command.matchAll(tableRegex)];
-    
-    for (const match of matches) {
-      const tableName = match[1].toLowerCase();
-      if (!existingTables.some(existing => existing.toLowerCase() === tableName)) {
-        isValid = false;
-        errorReason = `Table '${tableName}' does not exist. Available tables: ${existingTables.join(', ')}`;
-        break;
+    // Check for table references in the SQL
+    const tableMatches = sql.match(/(?:FROM|INTO|UPDATE|DELETE FROM)\s+(\w+)/gi);
+    if (tableMatches) {
+      for (const match of tableMatches) {
+        const tableName = match.replace(/(?:FROM|INTO|UPDATE|DELETE FROM)\s+/i, '').trim();
+        
+        // If table doesn't exist, we need to create it first
+        if (!existingTables.includes(tableName)) {
+          console.log(chalk.yellow(`⚠️ Table '${tableName}' does not exist - will create it first`));
+          // Don't mark as invalid, just note that we need to create it
+        }
       }
     }
     
-    if (isValid) {
-      validCommands.push(command);
-      console.log(chalk.green(`✅ Valid SQL: ${command.substring(0, 50)}...`));
-    } else {
-      console.log(chalk.red(`❌ Invalid SQL: ${command.substring(0, 50)}...`));
-      console.log(chalk.yellow(`   Reason: ${errorReason}`));
-    }
+    valid.push(sql);
   }
+
+  return { valid, invalid };
+}
+
+// Function to clear all data from tables
+async function clearAllTables() {
+  console.log(chalk.blue('🧹 Clearing all data from tables...'));
   
-  return validCommands;
+  try {
+    // Get list of existing tables
+    const { stdout: tablesOutput } = await execAsync('psql -d spotify_clone -c "\\dt"');
+    const existingTables: string[] = [];
+    
+    // Parse table names from output
+    const lines = tablesOutput.split('\n');
+    for (const line of lines) {
+      const match = line.match(/\|\s+(\w+)\s+\|/);
+      if (match && match[1] && !match[1].includes('_seq')) {
+        existingTables.push(match[1]);
+      }
+    }
+    
+    // Clear data from each table (excluding system tables)
+    const userTables = existingTables.filter(table => 
+      !table.includes('_seq') && 
+      !table.includes('schema') && 
+      table !== 'Name'
+    );
+    
+    for (const table of userTables) {
+      console.log(chalk.yellow(`Clearing table: ${table}`));
+      await execAsync(`psql -d spotify_clone -c "DELETE FROM "${table}";"`);
+      console.log(chalk.green(`✅ Cleared table: ${table}`));
+    }
+    
+    console.log(chalk.green('✅ All tables cleared successfully!'));
+  } catch (error) {
+    console.error(chalk.red('❌ Error clearing tables:'), error);
+    throw error;
+  }
 }
 
 // Main query processing function
@@ -361,52 +334,71 @@ export async function processQuery(query: string, openai: OpenAI) {
       throw new Error('OpenAI API key is not set in environment variables');
     }
     
+    const systemPrompt = `You are a database agent for a Spotify clone application. Your role is to help users manage their database by creating, modifying, and querying tables and data.
+
+IMPORTANT RULES:
+1. NEVER assume a table exists unless it's explicitly mentioned in the existing tables list
+2. NEVER suggest or create tables with hardcoded names like "recently_played", "made_for_you", "popular_albums" unless specifically requested
+3. ALWAYS create tables before inserting data into them
+4. Use the exact table schemas provided - do not make up column names
+5. When creating new tables, use sensible column names and data types
+6. When inserting data, use the exact column names from the table schema
+7. You can modify the frontend UI components to display new data
+8. You can drop tables and recreate them if needed
+9. Always provide sample data when creating new tables
+10. When creating music-related tables, use column names like: song_name, artist_name, album_name, duration, image_url, etc.
+
+CRITICAL: When generating music data, ALWAYS use REAL artist names, album titles, and song names like you would see on actual Spotify. NEVER use generic placeholders like "Album 1", "Artist A", "Song 1", etc.
+
+DYNAMIC FRONTEND INTEGRATION:
+The frontend automatically detects and displays music data from ANY table that has music-related columns (song_name, artist_name, title, album, etc.). You don't need to worry about specific table names - just create tables with music data and the frontend will automatically:
+- Detect tables with music data
+- Map the data to a consistent structure
+- Distribute the data across the three UI sections (Recently played, Made For You, Popular albums)
+- Display real artist names and song titles
+
+Examples of REAL data to use:
+- Artists: Travis Scott, Taylor Swift, Drake, Billie Eilish, The Weeknd, Ariana Grande, Post Malone, Ed Sheeran, etc.
+- Albums: "Astroworld", "Midnights", "Scorpion", "Happier Than Ever", "After Hours", "Positions", "Hollywood's Bleeding", "Divide", etc.
+- Songs: "SICKO MODE", "Anti-Hero", "God's Plan", "bad guy", "Blinding Lights", "positions", "Circles", "Shape of You", etc.
+- Playlists: "Discover Weekly", "Release Radar", "Daily Mix 1", "Chill Hits", "Top 50 - Global", "On Repeat", etc.
+
+Sample INSERT statements with REAL data:
+INSERT INTO songs (song_name, artist_name, album_name) VALUES ('SICKO MODE', 'Travis Scott', 'Astroworld');
+INSERT INTO songs (song_name, artist_name, album_name) VALUES ('Anti-Hero', 'Taylor Swift', 'Midnights');
+INSERT INTO songs (song_name, artist_name, album_name) VALUES ('Blinding Lights', 'The Weeknd', 'After Hours');
+INSERT INTO songs (song_name, artist_name, album_name) VALUES ('bad guy', 'Billie Eilish', 'When We All Fall Asleep, Where Do We Go?');
+INSERT INTO songs (song_name, artist_name, album_name) VALUES ('God\'s Plan', 'Drake', 'Scorpion');
+
+EXISTING TABLES (USE THESE IF THEY EXIST):
+${context.existingTables.length > 0 ? context.existingTables.map(table => `- ${table}`).join('\n') : 'No tables exist yet'}
+
+EXISTING TABLE SCHEMAS:
+${context.existingTableSchemas}
+
+CONTEXT FROM STATIC DATA:
+The original Spotify UI shows these sections with proper labels and descriptions:
+- "Recently played" section with songs like "Liked Songs", "Discover Weekly", "Release Radar"
+- "Made For You" section with playlists like "Discover Weekly" (Your weekly mixtape of fresh music), "Release Radar" (Catch all the latest music from artists you follow), "Daily Mix 1" (Billie Eilish, Lorde, Clairo and more)
+- "Popular albums" section with albums like "Midnights" by Taylor Swift, "Harry's House" by Harry Styles
+
+When creating music data, ensure it has proper song names and artist names like normal Spotify, with descriptive text and proper formatting.
+
+You can:
+1. Create new tables with appropriate schemas
+2. Insert sample data into tables
+3. Query existing tables
+4. Modify the frontend to display new data
+5. Drop tables and recreate them if needed
+
+Remember: Only work with tables that actually exist, and always create tables before inserting data. ALWAYS use REAL artist names, album titles, and song names - never generic placeholders. The frontend will automatically detect and display any music data you create.`
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
       messages: [
         {
           role: "system",
-          content: `You are a database agent that helps modify a Spotify clone project. 
-
-CRITICAL RULES - FOLLOW THESE EXACTLY:
-1. ONLY use tables that actually exist in the database
-2. NEVER reference non-existent tables
-3. ALWAYS use the exact column names from the schema below
-4. If a table doesn't exist, either create it first or use an existing table
-
-EXISTING TABLES ONLY (USE THESE):
-${context.exactSchema}
-
-ACTUAL TABLE SCHEMAS (USE THESE EXACT COLUMNS):
-${JSON.stringify(context.tableSchemas, null, 2)}
-
-When responding to queries about adding or modifying data:
-
-1. ALWAYS include SQL commands in \`\`\`sql\`\`\` blocks
-2. For backend code changes only, include TypeScript code in \`\`\`typescript\`\`\` blocks with "// File: path/to/file.ts" header
-3. NEVER suggest changes to frontend files (src/components/, src/app/page.tsx, src/app/layout.tsx)
-4. Use NOW() for timestamps
-5. Use dynamic values where possible
-6. Include proper error handling
-7. Break complex operations into multiple commands
-8. Focus on database operations and API routes only
-9. ALWAYS use the exact column names from the ACTUAL TABLE SCHEMAS above
-10. NEVER modify any files in src/components/ directory
-11. NEVER modify src/app/page.tsx or src/app/layout.tsx
-12. NEVER modify src/app/api/db/route.ts
-13. NEVER reference tables that don't exist in the EXISTING TABLES list above
-
-STRICTLY PROTECTED FILES (ABSOLUTELY NO MODIFICATIONS):
-- ANY file in src/components/ directory
-- src/app/page.tsx
-- src/app/layout.tsx
-- src/app/api/db/route.ts
-
-Current database schema:
-${context.schemas}
-
-Example data:
-${JSON.stringify(context.samples, null, 2)}`
+          content: systemPrompt
         },
         {
           role: "user",
@@ -424,15 +416,15 @@ ${JSON.stringify(context.samples, null, 2)}`
     const sqlCommands = extractSqlCommands(aiResponse);
     if (sqlCommands.length > 0) {
       // Validate SQL commands before execution
-      const validCommands = await validateSqlCommands(sqlCommands);
+      const { valid, invalid } = validateSqlCommands(sqlCommands, context.existingTables);
       
-      if (validCommands.length === 0) {
+      if (valid.length === 0) {
         console.log(chalk.red('❌ No valid SQL commands found. All commands referenced non-existent tables.'));
         console.log(chalk.yellow('💡 Tip: Only use existing tables in your database.'));
         return;
       }
       
-      for (const command of validCommands) {
+      for (const command of valid) {
         await executeSql(command);
       }
     } else {

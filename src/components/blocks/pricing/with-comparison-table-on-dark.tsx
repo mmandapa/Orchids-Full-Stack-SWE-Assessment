@@ -36,7 +36,7 @@ const sections = [
   },
 ]
 
-function classNames(...classes) {
+function classNames(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ')
 }
 
@@ -89,7 +89,7 @@ export default function WithComparisonTableOnDark() {
                   <li key={section.name}>
                     <ul role="list" className="space-y-4">
                       {section.features.map((feature) =>
-                        feature.tiers[tier.name] ? (
+                        feature.tiers[tier.name as keyof typeof feature.tiers] ? (
                           <li key={feature.name} className="flex gap-x-3">
                             <CheckIcon aria-hidden="true" className="h-6 w-5 flex-none text-indigo-400" />
                             <span>

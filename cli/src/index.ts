@@ -64,16 +64,37 @@ async function getAllTables(): Promise<string[]> {
     const lines = stdout.split('\n');
     const tables: string[] = [];
     
+    // Parse table names from PostgreSQL output
     for (const line of lines) {
+      // Look for lines that contain table information
       const match = line.match(/\|\s+(\w+)\s+\|/);
-      if (match && match[1] && !match[1].includes('_seq')) {
-        tables.push(match[1]);
+      if (match && match[1]) {
+        const tableName = match[1];
+        // Filter out sequences and system tables
+        if (!tableName.includes('_seq') && 
+            !tableName.includes('schema') && 
+            tableName !== 'Name' &&
+            tableName !== 'PopAlb_backup') {
+          tables.push(tableName);
+        }
       }
     }
     
-    return tables.filter(table => table.length > 0);
+    // Validate each table exists
+    const validTables: string[] = [];
+    for (const table of tables) {
+      try {
+        // Test if table exists by trying to get its schema
+        await execAsync(`psql -d spotify_clone -c "\\d "${table}""`);
+        validTables.push(table);
+      } catch (error) {
+        console.log(chalk.dim(`Skipping non-existent table: ${table}`));
+      }
+    }
+    
+    return validTables;
   } catch (error) {
-    console.error(chalk.red('Error getting tables:'), error);
+    console.error(chalk.red('❌ Error getting tables:'), error);
     return [];
   }
 }
@@ -83,6 +104,14 @@ async function viewTable(tableName: string, limit: number = 10) {
   try {
     console.log(chalk.blue(`Viewing table: ${tableName}`));
     console.log(chalk.dim('─'.repeat(50)));
+    
+    // First verify the table exists
+    try {
+      await execAsync(`psql -d spotify_clone -c "\\d "${tableName}""`);
+    } catch (error) {
+      console.error(chalk.red(`❌ Table '${tableName}' does not exist or cannot be accessed.`));
+      return;
+    }
     
     const { stdout } = await execAsync(`psql -d spotify_clone -c "SELECT * FROM "${tableName}" LIMIT ${limit};"`);
     
@@ -169,6 +198,11 @@ async function createInteractiveMenu() {
       name: 'Process AI query',
       value: 'query',
       description: 'Ask AI to perform database operations'
+    },
+    {
+      name: 'Reset database (wipe all data)',
+      value: 'reset',
+      description: 'Drop all tables and restore UI to original form'
     },
     {
       name: 'Show help',
@@ -303,6 +337,10 @@ async function runInteractiveMode() {
           console.log(chalk.green('Query processing completed!'));
           break;
           
+        case 'reset':
+          await resetDatabase();
+          break;
+          
         case 'help':
           console.log(chalk.blue('Database Agent - Help'));
           console.log(chalk.dim('─'.repeat(50)));
@@ -382,6 +420,216 @@ async function runInteractiveMode() {
   }
 }
 
+async function resetDatabase() {
+  console.log(chalk.red('⚠️  RESET DATABASE OPERATION'));
+  console.log(chalk.yellow('This will:'));
+  console.log(chalk.yellow('  • Drop all tables in the database'));
+  console.log(chalk.yellow('  • Clear all data'));
+  console.log(chalk.yellow('  • Restore UI to original static form'));
+  console.log(chalk.yellow('  • This action cannot be undone!'));
+  console.log('');
+
+  const { confirm } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirm',
+      message: 'Are you sure you want to reset the database?',
+      default: false
+    }
+  ]);
+
+  if (!confirm) {
+    console.log(chalk.green('Reset cancelled.'));
+    return;
+  }
+
+  const { confirmFinal } = await inquirer.prompt([
+    {
+      type: 'confirm',
+      name: 'confirmFinal',
+      message: 'Final confirmation: This will delete ALL data. Continue?',
+      default: false
+    }
+  ]);
+
+  if (!confirmFinal) {
+    console.log(chalk.green('Reset cancelled.'));
+    return;
+  }
+
+  try {
+    console.log(chalk.blue('🔄 Resetting database...'));
+    
+    // Get list of all tables
+    const { stdout: tablesOutput } = await execAsync('psql -d spotify_clone -c "\\dt"');
+    const tables: string[] = [];
+    const lines = tablesOutput.split('\n');
+    for (const line of lines) {
+      const match = line.match(/\|\s+(\w+)\s+\|/);
+      if (match && match[1] && !match[1].includes('_seq')) {
+        tables.push(match[1]);
+      }
+    }
+
+    // Drop all tables
+    for (const table of tables) {
+      console.log(chalk.yellow(`Dropping table: ${table}`));
+      await execAsync(`psql -d spotify_clone -c "DROP TABLE IF EXISTS ${table} CASCADE;"`);
+    }
+
+    console.log(chalk.green('✅ Database reset complete!'));
+    console.log(chalk.blue('📝 All tables have been dropped.'));
+    console.log(chalk.blue('🔄 The UI will now show original static content.'));
+    console.log(chalk.blue('💡 Use the agent to create new tables and add data.'));
+    
+  } catch (error) {
+    console.error(chalk.red('❌ Error resetting database:'), error);
+  }
+}
+
+async function interactiveMode() {
+  console.clear();
+  
+  // Display logo
+  const logo = figlet.textSync('DB-AGENT', { font: 'Big' });
+  const gradientLogo = gradient.rainbow(logo);
+  console.log(gradientLogo);
+  console.log(chalk.dim('(by orchids)'));
+  console.log('');
+  console.log(chalk.blue('Database Agent'));
+  console.log(chalk.dim('AI-powered database operations for Spotify clone'));
+  console.log('─'.repeat(64));
+  console.log(chalk.dim('Keyboard shortcuts:'));
+  console.log(chalk.dim('  Arrow keys: Navigate options'));
+  console.log(chalk.dim('  Type: Search options'));
+  console.log(chalk.dim('  Enter: Select option'));
+  console.log(chalk.dim('  Ctrl+C: Exit anytime'));
+  console.log('─'.repeat(64));
+  console.log('');
+
+  while (true) {
+    try {
+      const { action } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'action',
+          message: 'What would you like to do?',
+          choices: [
+            { name: 'Process AI query', value: 'query' },
+            { name: 'View tables', value: 'view-tables' },
+            { name: 'View table data', value: 'view-data' },
+            { name: 'Reset database (wipe all data)', value: 'reset' },
+            { name: 'Exit', value: 'exit' }
+          ]
+        }
+      ]);
+
+      if (action === 'exit') {
+        console.log(chalk.green('👋 Goodbye!'));
+        process.exit(0);
+      }
+
+      if (action === 'reset') {
+        await resetDatabase();
+        console.log('');
+        continue;
+      }
+
+      if (action === 'query') {
+        const { query } = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'query',
+            message: 'Enter your database query:'
+          }
+        ]);
+
+        console.log(chalk.blue('Database Agent: Processing your query...'));
+        console.log(chalk.dim('Query:', query));
+        const openai = new OpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+        });
+        await processQuery(query, openai);
+        console.log('');
+      }
+
+      if (action === 'view-tables') {
+        try {
+          const { stdout } = await execAsync('psql -d spotify_clone -c "\\dt"');
+          console.log(chalk.blue('📊 Available tables:'));
+          console.log(stdout);
+        } catch (error) {
+          console.error(chalk.red('❌ Error viewing tables:'), error);
+        }
+        console.log('');
+      }
+
+      if (action === 'view-data') {
+        try {
+          const { stdout: tablesOutput } = await execAsync('psql -d spotify_clone -c "\\dt"');
+          const tables: string[] = [];
+          const lines = tablesOutput.split('\n');
+          for (const line of lines) {
+            const match = line.match(/\|\s+(\w+)\s+\|/);
+            if (match && match[1] && !match[1].includes('_seq')) {
+              tables.push(match[1]);
+            }
+          }
+
+          if (tables.length === 0) {
+            console.log(chalk.yellow('No tables found in database.'));
+            console.log('');
+            continue;
+          }
+
+          const { table } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'table',
+              message: 'Select a table to view:',
+              choices: tables
+            }
+          ]);
+
+          const { rows } = await inquirer.prompt([
+            {
+              type: 'number',
+              name: 'rows',
+              message: 'How many rows to display?',
+              default: 5
+            }
+          ]);
+
+          const { stdout } = await execAsync(`psql -d spotify_clone -c "SELECT * FROM ${table} LIMIT ${rows};"`);
+          console.log(chalk.blue(`Viewing table: ${table}`));
+          console.log('─'.repeat(34));
+          console.log(stdout);
+          console.log(`Displayed up to ${rows} rows from ${table}`);
+          
+          await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'continue',
+              message: 'Press Enter to continue...'
+            }
+          ]);
+        } catch (error) {
+          console.error(chalk.red('❌ Error viewing table data:'), error);
+        }
+        console.log('');
+      }
+
+    } catch (error) {
+      if (error && typeof error === 'object' && 'isTtyError' in error) {
+        console.log(chalk.red('❌ Interactive mode not supported in this environment.'));
+        process.exit(1);
+      } else {
+        console.error(chalk.red('❌ Error:'), error);
+      }
+    }
+  }
+}
+
 // Create CLI program
 const program = new Command();
 
@@ -394,7 +642,7 @@ program
 program
   .description('Interactive database agent')
   .action(async () => {
-    await runInteractiveMode();
+    await interactiveMode();
   });
 
 // Query command

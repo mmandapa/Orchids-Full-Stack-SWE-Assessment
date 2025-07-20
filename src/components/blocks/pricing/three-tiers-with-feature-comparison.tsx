@@ -63,7 +63,7 @@ const sections = [
   },
 ]
 
-function classNames(...classes) {
+function classNames(...classes: (string | undefined | null | false)[]) {
   return classes.filter(Boolean).join(' ')
 }
 
@@ -245,22 +245,22 @@ export default function ThreeTiersWithFeatureComparison() {
                                 >
                                   <dt className="pr-4 text-gray-600">{feature.name}</dt>
                                   <dd className="flex items-center justify-end sm:justify-center sm:px-4">
-                                    {typeof feature.tiers[tier.name] === 'string' ? (
+                                    {typeof feature.tiers[tier.name as keyof typeof feature.tiers] === 'string' ? (
                                       <span
                                         className={tier.featured ? 'font-semibold text-indigo-600' : 'text-gray-900'}
                                       >
-                                        {feature.tiers[tier.name]}
+                                        {feature.tiers[tier.name as keyof typeof feature.tiers]}
                                       </span>
                                     ) : (
                                       <>
-                                        {feature.tiers[tier.name] === true ? (
+                                        {feature.tiers[tier.name as keyof typeof feature.tiers] === true ? (
                                           <CheckIcon aria-hidden="true" className="mx-auto size-5 text-indigo-600" />
                                         ) : (
                                           <XMarkIcon aria-hidden="true" className="mx-auto size-5 text-gray-400" />
                                         )}
 
                                         <span className="sr-only">
-                                          {feature.tiers[tier.name] === true ? 'Yes' : 'No'}
+                                          {feature.tiers[tier.name as keyof typeof feature.tiers] === true ? 'Yes' : 'No'}
                                         </span>
                                       </>
                                     )}
@@ -356,25 +356,25 @@ export default function ThreeTiersWithFeatureComparison() {
                             {tiers.map((tier) => (
                               <td key={tier.id} className="relative w-1/4 px-4 py-0 text-center">
                                 <span className="relative size-full py-3">
-                                  {typeof feature.tiers[tier.name] === 'string' ? (
+                                  {typeof feature.tiers[tier.name as keyof typeof feature.tiers] === 'string' ? (
                                     <span
                                       className={classNames(
                                         tier.featured ? 'font-semibold text-indigo-600' : 'text-gray-900',
                                         'text-sm/6',
                                       )}
                                     >
-                                      {feature.tiers[tier.name]}
+                                      {feature.tiers[tier.name as keyof typeof feature.tiers]}
                                     </span>
                                   ) : (
                                     <>
-                                      {feature.tiers[tier.name] === true ? (
+                                      {feature.tiers[tier.name as keyof typeof feature.tiers] === true ? (
                                         <CheckIcon aria-hidden="true" className="mx-auto size-5 text-indigo-600" />
                                       ) : (
                                         <XMarkIcon aria-hidden="true" className="mx-auto size-5 text-gray-400" />
                                       )}
 
                                       <span className="sr-only">
-                                        {feature.tiers[tier.name] === true ? 'Yes' : 'No'}
+                                        {feature.tiers[tier.name as keyof typeof feature.tiers] === true ? 'Yes' : 'No'}
                                       </span>
                                     </>
                                   )}
