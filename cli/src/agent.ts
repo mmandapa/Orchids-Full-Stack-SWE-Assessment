@@ -6,7 +6,7 @@ import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import * as dotenv from 'dotenv';
-import { writeFile, readFile, copyFile, access } from 'fs/promises';
+import { writeFile, readFile, copyFile, access, mkdir } from 'fs/promises';
 
 // Load environment variables
 const envPath = join(process.cwd(), '.env');
@@ -100,27 +100,53 @@ async function testFileValidity(filePath: string): Promise<boolean> {
   }
 }
 
+// Function to ensure directory exists
+async function ensureDirectoryExists(filePath: string) {
+  try {
+    const fullPath = join(process.cwd(), filePath);
+    const dir = dirname(fullPath);
+    await mkdir(dir, { recursive: true });
+    console.log(chalk.blue(`📁 Ensured directory exists: ${dir}`));
+  } catch (error) {
+    // Directory might already exist, which is fine
+    console.log(chalk.dim(`📁 Directory check: ${dirname(join(process.cwd(), filePath))}`));
+  }
+}
+
 // Function to create or update a file with backup and validation
 async function updateFile(filePath: string, content: string) {
   try {
     const fullPath = join(process.cwd(), filePath);
     console.log(chalk.yellow(`📝 Updating file: ${fullPath}`));
     
-    // Backup the file before modification
-    const backupPath = await backupFile(filePath);
+    // Ensure directory exists
+    await ensureDirectoryExists(filePath);
     
-    // Update the file
+    // Check if file exists for backup
+    let backupPath: string | null = null;
+    try {
+      await access(fullPath);
+      // File exists, create backup
+      backupPath = await backupFile(filePath);
+    } catch (error) {
+      // File doesn't exist, no backup needed
+      console.log(chalk.blue(`📄 Creating new file: ${filePath}`));
+    }
+    
+    // Update or create the file
     await writeFile(fullPath, content, 'utf8');
     console.log(chalk.green('✅ File updated successfully!'));
     
-    // Test if the updated file is valid
-    const isValid = await testFileValidity(filePath);
-    if (!isValid) {
-      console.log(chalk.red('❌ File validation failed!'));
-      console.log(chalk.yellow('🔄 Auto-restoring from backup...'));
-      await restoreFile(filePath, backupPath);
-      console.log(chalk.green('✅ File restored successfully!'));
-      throw new Error(`File validation failed for ${filePath}`);
+    // Test if the updated file is valid (only for existing files)
+    if (backupPath) {
+      const isValid = await testFileValidity(filePath);
+      if (!isValid) {
+        console.log(chalk.red('❌ File validation failed!'));
+        console.log(chalk.yellow('🔄 Auto-restoring from backup...'));
+        await restoreFile(filePath, backupPath);
+        console.log(chalk.green('✅ File restored successfully!'));
+        throw new Error(`File validation failed for ${filePath}`);
+      }
     }
     
     return backupPath;
@@ -137,7 +163,11 @@ async function updateFile(filePath: string, content: string) {
 }
 
 // Function to clean up backup files
-async function cleanupBackup(filePath: string, backupPath: string) {
+async function cleanupBackup(filePath: string, backupPath: string | null) {
+  if (!backupPath) {
+    return; // No backup to clean up
+  }
+  
   try {
     await access(backupPath);
     await writeFile(backupPath, ''); // Clear the backup file
@@ -164,6 +194,11 @@ async function analyzeContext(query: string) {
     const { stdout: recentlyPlayed } = await execAsync('psql -d spotify_clone -c "SELECT * FROM recently_played LIMIT 3;"');
     console.log(chalk.dim('Sample data:'), recentlyPlayed);
     
+    // Get actual table schemas dynamically
+    const { stdout: artistsSchema } = await execAsync('psql -d spotify_clone -c "\\d artists"');
+    const { stdout: popularAlbumsSchema } = await execAsync('psql -d spotify_clone -c "\\d popular_albums"');
+    const { stdout: madeForYouSchema } = await execAsync('psql -d spotify_clone -c "\\d made_for_you"');
+    
     return {
       relevantFiles: [
         'db/schema.ts',
@@ -178,7 +213,13 @@ async function analyzeContext(query: string) {
       exactSchema: {
         recently_played: ['id', 'song_title', 'artist_name', 'played_at'],
         popular_albums: ['id', 'title', 'artist', 'cover_image', 'release_date', 'total_tracks', 'popularity', 'created_at'],
-        made_for_you: ['id', 'user_id', 'playlist_id', 'title', 'description', 'cover_image', 'created_at']
+        made_for_you: ['id', 'user_id', 'playlist_id', 'title', 'description', 'cover_image', 'created_at'],
+        artists: ['id', 'name', 'bio', 'created_at', 'updated_at']
+      },
+      tableSchemas: {
+        artists: artistsSchema,
+        popular_albums: popularAlbumsSchema,
+        made_for_you: madeForYouSchema
       }
     };
   } catch (error) {
@@ -239,7 +280,7 @@ function extractTypeScriptCode(response: string): { file: string; code: string }
   ];
   
   const allowedFiles = files.filter(f => {
-    const isProtected = protectedFiles.some(protected => f.file.includes(protected));
+    const isProtected = protectedFiles.some(protectedPath => f.file.includes(protectedPath));
     if (isProtected) {
       console.log(chalk.red(`🚫 BLOCKED: Attempted to modify protected frontend file: ${f.file}`));
       console.log(chalk.yellow('💡 Tip: Frontend files are protected to prevent UI changes.'));
@@ -282,6 +323,9 @@ CRITICAL: You MUST use the exact column names from the schema below. Do NOT gues
 EXACT TABLE SCHEMAS:
 ${JSON.stringify(context.exactSchema, null, 2)}
 
+ACTUAL TABLE SCHEMAS (USE THESE EXACT COLUMNS):
+${JSON.stringify(context.tableSchemas, null, 2)}
+
 When responding to queries about adding or modifying data:
 
 1. ALWAYS include SQL commands in \`\`\`sql\`\`\` blocks
@@ -292,7 +336,7 @@ When responding to queries about adding or modifying data:
 6. Include proper error handling
 7. Break complex operations into multiple commands
 8. Focus on database operations and API routes only
-9. ALWAYS use the exact column names from the schema above
+9. ALWAYS use the exact column names from the ACTUAL TABLE SCHEMAS above
 10. NEVER modify any files in src/components/ directory
 11. NEVER modify src/app/page.tsx or src/app/layout.tsx
 12. NEVER modify src/app/api/db/route.ts
@@ -335,19 +379,35 @@ ${JSON.stringify(context.samples, null, 2)}`
     console.log(chalk.yellow('\n📝 Step 4: Updating TypeScript Files'));
     const tsFiles = extractTypeScriptCode(aiResponse);
     if (tsFiles.length > 0) {
-      const backups: { file: string; backup: string }[] = [];
+      const backups: { file: string; backup: string | null }[] = [];
       for (const { file, code } of tsFiles) {
         try {
+          console.log(chalk.blue(`📝 Processing file: ${file}`));
           const backupPath = await updateFile(file, code);
-          backups.push({ file, backup: backupPath });
+          if (backupPath) {
+            backups.push({ file, backup: backupPath });
+          } else {
+            backups.push({ file, backup: null });
+          }
+          console.log(chalk.green(`✅ Successfully processed: ${file}`));
         } catch (error) {
-          console.log(chalk.red(`❌ Failed to update ${file}, skipping...`));
+          console.log(chalk.red(`❌ Failed to update ${file}:`));
+          if (error instanceof Error) {
+            console.log(chalk.dim(`   Error: ${error.message}`));
+          }
+          console.log(chalk.yellow(`   Skipping file and continuing...`));
         }
       }
       
       // Clean up successful backups
       for (const { file, backup } of backups) {
-        await cleanupBackup(file, backup);
+        if (backup) {
+          try {
+            await cleanupBackup(file, backup);
+          } catch (error) {
+            console.log(chalk.yellow(`⚠️ Could not cleanup backup for ${file}`));
+          }
+        }
       }
     } else {
       console.log(chalk.yellow('  - No TypeScript files to update'));
