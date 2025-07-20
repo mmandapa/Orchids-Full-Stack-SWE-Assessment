@@ -292,6 +292,56 @@ function extractTypeScriptCode(response: string): { file: string; code: string }
   return allowedFiles;
 }
 
+// Function to validate SQL commands against existing tables
+async function validateSqlCommands(sqlCommands: string[]): Promise<string[]> {
+  console.log(chalk.blue('🔍 Validating SQL commands against existing tables...'));
+  
+  // Get list of existing tables
+  const { stdout: tablesOutput } = await execAsync('psql -d spotify_clone -c "\\dt"');
+  const existingTables: string[] = [];
+  
+  // Parse table names from output
+  const lines = tablesOutput.split('\n');
+  for (const line of lines) {
+    const match = line.match(/\|\s+(\w+)\s+\|/);
+    if (match && match[1] && !match[1].includes('_seq')) {
+      existingTables.push(match[1]);
+    }
+  }
+  
+  console.log(chalk.dim('Existing tables:'), existingTables);
+  
+  // Validate each SQL command
+  const validCommands: string[] = [];
+  for (const command of sqlCommands) {
+    let isValid = true;
+    let errorReason = '';
+    
+    // Check for table references
+    const tableRegex = /(?:FROM|INTO|UPDATE|DELETE FROM)\s+(\w+)/gi;
+    const matches = [...command.matchAll(tableRegex)];
+    
+    for (const match of matches) {
+      const tableName = match[1].toLowerCase();
+      if (!existingTables.some(existing => existing.toLowerCase() === tableName)) {
+        isValid = false;
+        errorReason = `Table '${tableName}' does not exist. Available tables: ${existingTables.join(', ')}`;
+        break;
+      }
+    }
+    
+    if (isValid) {
+      validCommands.push(command);
+      console.log(chalk.green(`✅ Valid SQL: ${command.substring(0, 50)}...`));
+    } else {
+      console.log(chalk.red(`❌ Invalid SQL: ${command.substring(0, 50)}...`));
+      console.log(chalk.yellow(`   Reason: ${errorReason}`));
+    }
+  }
+  
+  return validCommands;
+}
+
 // Main query processing function
 export async function processQuery(query: string, openai: OpenAI) {
   try {
@@ -318,10 +368,14 @@ export async function processQuery(query: string, openai: OpenAI) {
           role: "system",
           content: `You are a database agent that helps modify a Spotify clone project. 
 
-CRITICAL: You MUST use the exact column names from the schema below. Do NOT guess or assume column names.
+CRITICAL RULES - FOLLOW THESE EXACTLY:
+1. ONLY use tables that actually exist in the database
+2. NEVER reference non-existent tables
+3. ALWAYS use the exact column names from the schema below
+4. If a table doesn't exist, either create it first or use an existing table
 
-EXACT TABLE SCHEMAS:
-${JSON.stringify(context.exactSchema, null, 2)}
+EXISTING TABLES ONLY (USE THESE):
+${context.exactSchema}
 
 ACTUAL TABLE SCHEMAS (USE THESE EXACT COLUMNS):
 ${JSON.stringify(context.tableSchemas, null, 2)}
@@ -340,6 +394,7 @@ When responding to queries about adding or modifying data:
 10. NEVER modify any files in src/components/ directory
 11. NEVER modify src/app/page.tsx or src/app/layout.tsx
 12. NEVER modify src/app/api/db/route.ts
+13. NEVER reference tables that don't exist in the EXISTING TABLES list above
 
 STRICTLY PROTECTED FILES (ABSOLUTELY NO MODIFICATIONS):
 - ANY file in src/components/ directory
@@ -368,7 +423,16 @@ ${JSON.stringify(context.samples, null, 2)}`
     console.log(chalk.yellow('\n📝 Step 3: Executing Database Changes'));
     const sqlCommands = extractSqlCommands(aiResponse);
     if (sqlCommands.length > 0) {
-      for (const command of sqlCommands) {
+      // Validate SQL commands before execution
+      const validCommands = await validateSqlCommands(sqlCommands);
+      
+      if (validCommands.length === 0) {
+        console.log(chalk.red('❌ No valid SQL commands found. All commands referenced non-existent tables.'));
+        console.log(chalk.yellow('💡 Tip: Only use existing tables in your database.'));
+        return;
+      }
+      
+      for (const command of validCommands) {
         await executeSql(command);
       }
     } else {
