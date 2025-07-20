@@ -171,9 +171,9 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
         popularAlbumsRes.json()
       ]);
 
-      setRecentlyPlayed(recentlyPlayedData.data || []);
-      setMadeForYou(madeForYouData.data || []);
-      setPopularAlbums(popularAlbumsData.data || []);
+      setRecentlyPlayed(recentlyPlayedData || []);
+      setMadeForYou(madeForYouData || []);
+      setPopularAlbums(popularAlbumsData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
       setError('Failed to load content. Please try again.');
@@ -201,7 +201,7 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
   }
 
   if (error) {
-  return (
+    return (
       <div className="flex-1 overflow-y-auto bg-[var(--color-background)] text-[var(--color-text-primary)]">
         <ErrorMessage message={error} onRetry={fetchData} />
       </div>
