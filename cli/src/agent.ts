@@ -338,12 +338,11 @@ export async function processQuery(query: string, openai: OpenAI) {
 
 IMPORTANT RULES:
 1. NEVER assume a table exists unless it's explicitly mentioned in the existing tables list
-2. NEVER suggest or create tables with hardcoded names like "recently_played", "made_for_you", "popular_albums" unless specifically requested
-3. ALWAYS create tables before inserting data into them
-4. Use the exact table schemas provided - do not make up column names
-5. When creating new tables, use sensible column names and data types
-6. When inserting data, use the exact column names from the table schema
-7. You can modify the frontend UI component to display data from any table structure
+2. ALWAYS create tables before inserting data into them
+3. Use the exact table schemas provided - do not make up column names
+4. When creating new tables, use sensible column names and data types
+5. When inserting data, use the exact column names from the table schema
+6. You can modify the frontend UI component to display data from any table structure
 
 CRITICAL DATA RULES:
 - ALWAYS generate REAL artist names, song titles, and album names - NEVER use test names, placeholders, or generic names
@@ -372,32 +371,133 @@ The frontend has EXACTLY THREE main sections that display music data in this spe
    - Contains popular albums and new releases
    - Examples: "SOS - SZA", "One Thing at a Time - Morgan Wallen", "GUTS - Olivia Rodrigo"
 
-USER QUERY MAPPING - MATCH REQUESTS TO CORRECT SECTIONS:
-When users make requests, you MUST identify which UI section they're referring to and update the correct section:
+DATA CHARACTERISTICS BY SECTION - UNDERSTAND WHAT TO GENERATE:
+
+"Recently Played" Section Data Characteristics:
+- Individual songs the user has recently listened to
+- Recent albums the user has played
+- Playlists the user has recently accessed
+- Mix of genres and artists the user actually listens to
+- Personal listening history and activity
+- Data should feel like actual user behavior and preferences
+- Include both individual tracks and full albums/playlists
+- Mix of popular and personal music choices
+
+"Made For You" Section Data Characteristics:
+- Curated playlists created by Spotify's algorithm
+- Daily Mixes (Daily Mix 1, Daily Mix 2, etc.)
+- Weekly discovery playlists (Discover Weekly, Release Radar)
+- Personalized recommendations based on user taste
+- Themed playlists (Chill Hits, Peaceful Piano, Deep Focus)
+- Time-based playlists (On Repeat, Time Capsule)
+- Genre-specific mixes and mood-based playlists
+- Data should feel algorithmically curated and personalized
+- Include descriptive text about the playlist's purpose
+- Mix of familiar artists and new discoveries
+
+"Popular Albums" Section Data Characteristics:
+- Trending and chart-topping albums
+- New releases from popular artists
+- Albums that are currently popular globally
+- Hit albums and successful releases
+- Albums from major artists and rising stars
+- Current music trends and popular genres
+- Data should feel like current music charts and trends
+- Include both established and emerging artists
+- Focus on full albums, not individual songs
+- Mix of different genres and styles
+
+CONTENT PATTERNS AND EXAMPLES:
+
+For "Recently Played" - Generate data that represents:
+- Individual song titles with artist names
+- Album names with artist names  
+- Playlist names with creator/curator names
+- Mix of recent listening activity
+- Personal music choices and preferences
+- Realistic listening patterns and behavior
+
+For "Made For You" - Generate data that represents:
+- Playlist names with descriptive subtitles
+- Daily Mix playlists (Daily Mix 1, Daily Mix 2, etc.)
+- Weekly discovery playlists (Discover Weekly, Release Radar)
+- Themed playlists (Chill Hits, Peaceful Piano, Deep Focus)
+- Personalized recommendation playlists
+- Time-based playlists (On Repeat, Time Capsule)
+- Include descriptive text about the playlist's purpose or theme
+
+For "Popular Albums" - Generate data that represents:
+- Album titles with artist names
+- New releases and trending albums
+- Chart-topping and popular albums
+- Albums from major artists and rising stars
+- Current music trends and popular genres
+- Focus on full albums, not individual songs
+
+CRITICAL DATA GENERATION RULES:
+- ALWAYS generate REAL artist names, song titles, and album names
+- NEVER use test names, placeholders, or generic names
+- Use current, popular artists and music
+- Make data feel authentic and realistic
+- Match the content type expected for each section
+- Include appropriate descriptive text and context
+- Ensure data fits the Spotify-like experience for each section
+
+INTELLIGENT QUERY MAPPING - MATCH REQUESTS TO CORRECT SECTIONS:
+When users make requests, you MUST intelligently identify which UI section they're referring to and update the correct section:
 
 KEYWORDS THAT MAP TO "Recently Played" (FIRST section):
 - "recently played" / "recent" / "played" / "recently listened" / "recently played songs"
 - "songs" / "tracks" / "music" (when context suggests recent activity)
 - "individual songs" / "recent tracks" / "what I played"
 - "my recent music" / "recently played albums"
+- "history" / "listening history" / "recent activity"
+- "what I've been playing" / "my recent tracks"
 
 KEYWORDS THAT MAP TO "Made For You" (SECOND section):
 - "made for you" / "made" / "for you" / "personalized" / "recommendations"
 - "playlists" / "daily mix" / "discover weekly" / "release radar"
 - "curated" / "personalized playlists" / "recommended"
 - "daily mixes" / "discover" / "weekly" / "radar"
+- "personalized" / "recommendations" / "curated for me"
+- "my playlists" / "personal playlists" / "custom playlists"
 
 KEYWORDS THAT MAP TO "Popular Albums" (THIRD section):
 - "popular albums" / "popular" / "albums" / "trending" / "new releases"
 - "trending albums" / "popular music" / "new albums"
 - "top albums" / "charting albums" / "hit albums"
+- "new releases" / "latest albums" / "trending music"
+- "chart toppers" / "hit songs" / "popular artists"
+
+SMART TABLE NAMING CONVENTION:
+When creating tables, use these naming patterns to help the frontend automatically map data to the correct sections:
+
+For "Recently Played" section:
+- Table names: "recently_played_songs", "recent_tracks", "listening_history", "recent_activity"
+- Data type: Individual songs, albums, or playlists the user has recently played
+
+For "Made For You" section:
+- Table names: "made_for_you_playlists", "personalized_mixes", "daily_mixes", "recommended_playlists"
+- Data type: Curated playlists, daily mixes, personalized recommendations
+
+For "Popular Albums" section:
+- Table names: "popular_albums", "trending_albums", "new_releases", "chart_toppers"
+- Data type: Popular albums, new releases, trending music
 
 EXAMPLES OF CORRECT MAPPING:
-- User says "create a table with recently played songs" → Update "Recently Played" section (FIRST)
-- User says "add some made for you playlists" → Update "Made For You" section (SECOND)  
-- User says "update popular albums" → Update "Popular Albums" section (THIRD)
-- User says "add songs to recently played" → Update "Recently Played" section (FIRST)
-- User says "create playlists for made for you" → Update "Made For You" section (SECOND)
+- User says "create a table with recently played songs" → Create "recently_played_songs" table → Update "Recently Played" section (FIRST)
+- User says "add some made for you playlists" → Create "made_for_you_playlists" table → Update "Made For You" section (SECOND)  
+- User says "update popular albums" → Create "popular_albums" table → Update "Popular Albums" section (THIRD)
+- User says "add songs to recently played" → Update "recently_played_songs" table → Update "Recently Played" section (FIRST)
+- User says "create playlists for made for you" → Create "made_for_you_playlists" table → Update "Made For You" section (SECOND)
+
+CONTEXT-AWARE MAPPING:
+If the user doesn't specify a section explicitly, analyze the context:
+- If they mention "songs" or "tracks" → Likely "Recently Played"
+- If they mention "playlists" or "mixes" → Likely "Made For You"  
+- If they mention "albums" or "releases" → Likely "Popular Albums"
+- If they mention "popular" or "trending" → Likely "Popular Albums"
+- If they mention "personalized" or "recommended" → Likely "Made For You"
 
 CRITICAL: When a user asks to update a specific section, you MUST:
 1. Identify which of the THREE UI sections they're referring to

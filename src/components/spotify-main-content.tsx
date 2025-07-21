@@ -10,6 +10,7 @@ interface Track {
   album: string
   albumArt: string
   duration: number
+  [key: string]: any // Allow dynamic properties from database
 }
 
 interface MusicCardProps {
@@ -110,7 +111,7 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           return
         }
         
-        // Fetch data from ALL tables (no filtering by name)
+        // Fetch data from ALL tables
         const allData: { [key: string]: any[] } = {}
         
         for (const table of tables) {
@@ -126,21 +127,19 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           }
         }
         
-        // Collect ALL music data from ALL tables dynamically
-        const allMusicData: any[] = []
+        // Intelligent mapping based on table names and content
         const recentlyPlayedData: any[] = []
         const madeForYouData: any[] = []
         const popularAlbumsData: any[] = []
+        const unassignedData: any[] = []
         
         for (const [tableName, data] of Object.entries(allData)) {
           if (data.length > 0) {
-            // Check if this table has ANY data that could be music-related
             const firstRow = data[0]
             if (firstRow) {
-              // Get all column names from the first row
               const columns = Object.keys(firstRow)
               
-              // Look for any column that might contain music data
+              // Check if this table has music-related data
               const hasMusicData = columns.some(col => {
                 const colLower = col.toLowerCase()
                 return colLower.includes('name') || 
@@ -173,7 +172,7 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
                   return fallback
                 }
 
-                // Map the data to a consistent structure, always preferring titles/names over IDs
+                // Map the data to a consistent structure
                 const mappedData = data.map(item => {
                   const columns = Object.keys(item)
                   
@@ -214,105 +213,214 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
                     artist: preferReal(artist, 'Unknown Artist'),
                     album: preferReal(album, 'Unknown Album'),
                     image: image,
-                    duration: item.duration || Math.floor(Math.random() * 300) + 120
+                    duration: item.duration || Math.floor(Math.random() * 300) + 120,
+                    // Preserve original item properties for dynamic access
+                    ...item
                   }
                 })
                 
-                // Intelligently map tables to UI sections based on table name and content
+                // INTELLIGENT SECTION MAPPING based on table name and content
                 const tableNameLower = tableName.toLowerCase()
                 
-                // Check if this table is intended for "Recently Played" section
-                if (tableNameLower.includes('recent') || 
-                    tableNameLower.includes('played') || 
-                    tableNameLower.includes('listened') ||
-                    tableNameLower.includes('history') ||
-                    tableNameLower.includes('song') ||
-                    tableNameLower.includes('track')) {
-                  console.log(`Mapping table ${tableName} to Recently Played section`)
-                  recentlyPlayedData.push(...mappedData)
+                // Check for Recently Played indicators
+                const isRecentlyPlayed = tableNameLower.includes('recent') || 
+                                       tableNameLower.includes('played') || 
+                                       tableNameLower.includes('listened') ||
+                                       tableNameLower.includes('history') ||
+                                       tableNameLower.includes('activity') ||
+                                       tableNameLower.includes('song') ||
+                                       tableNameLower.includes('track') ||
+                                       tableNameLower.includes('recently_played') ||
+                                       tableNameLower.includes('recent_tracks') ||
+                                       tableNameLower.includes('listening_history')
+                
+                // Check for Made For You indicators
+                const isMadeForYou = tableNameLower.includes('made') || 
+                                   tableNameLower.includes('for') || 
+                                   tableNameLower.includes('you') ||
+                                   tableNameLower.includes('personal') ||
+                                   tableNameLower.includes('recommend') ||
+                                   tableNameLower.includes('playlist') ||
+                                   tableNameLower.includes('mix') ||
+                                   tableNameLower.includes('weekly') ||
+                                   tableNameLower.includes('daily') ||
+                                   tableNameLower.includes('curated') ||
+                                   tableNameLower.includes('personalized') ||
+                                   tableNameLower.includes('made_for_you') ||
+                                   tableNameLower.includes('personalized_mixes') ||
+                                   tableNameLower.includes('daily_mixes') ||
+                                   tableNameLower.includes('recommended_playlists')
+                
+                // Check for Popular Albums indicators
+                const isPopularAlbums = tableNameLower.includes('popular') || 
+                                      tableNameLower.includes('album') || 
+                                      tableNameLower.includes('trending') ||
+                                      tableNameLower.includes('chart') ||
+                                      tableNameLower.includes('hit') ||
+                                      tableNameLower.includes('top') ||
+                                      tableNameLower.includes('new') ||
+                                      tableNameLower.includes('release') ||
+                                      tableNameLower.includes('popular_albums') ||
+                                      tableNameLower.includes('trending_albums') ||
+                                      tableNameLower.includes('new_releases') ||
+                                      tableNameLower.includes('chart_toppers')
+                
+                // CONTENT-BASED MAPPING (analyze actual data content)
+                const contentAnalysis = mappedData.reduce((acc, item) => {
+                  const title = item.title.toLowerCase()
+                  const artist = item.artist.toLowerCase()
+                  const album = item.album.toLowerCase()
+                  
+                  // Check for playlist indicators in content
+                  if (title.includes('mix') || title.includes('playlist') || title.includes('weekly') || 
+                      title.includes('daily') || title.includes('discover') || title.includes('radar') ||
+                      title.includes('on repeat') || title.includes('time capsule') || title.includes('chill') ||
+                      title.includes('peaceful') || title.includes('deep focus') || title.includes('instrumental')) {
+                    acc.playlistCount++
+                  }
+                  
+                  // Check for album indicators in content
+                  if (album !== 'unknown album' && album.length > 0 && 
+                      !title.includes('playlist') && !title.includes('mix') && !title.includes('weekly')) {
+                    acc.albumCount++
+                  }
+                  
+                  // Check for individual song indicators
+                  if (title.length > 0 && artist.length > 0 && 
+                      !title.includes('playlist') && !title.includes('mix') && 
+                      !title.includes('weekly') && !title.includes('daily') &&
+                      !title.includes('discover') && !title.includes('radar')) {
+                    acc.songCount++
+                  }
+                  
+                  // Check for "Made For You" specific patterns
+                  if (title.includes('daily mix') || title.includes('discover weekly') || 
+                      title.includes('release radar') || title.includes('on repeat') ||
+                      title.includes('time capsule') || title.includes('chill hits') ||
+                      title.includes('peaceful piano') || title.includes('deep focus')) {
+                    acc.madeForYouCount++
+                  }
+                  
+                  // Check for "Recently Played" specific patterns (individual songs/albums)
+                  if (artist !== 'unknown artist' && title !== 'unknown title' && 
+                      !title.includes('playlist') && !title.includes('mix') &&
+                      !title.includes('weekly') && !title.includes('daily')) {
+                    acc.recentlyPlayedCount++
+                  }
+                  
+                  // Check for "Popular Albums" specific patterns
+                  if (album !== 'unknown album' && album.length > 0 && 
+                      !title.includes('playlist') && !title.includes('mix')) {
+                    acc.popularAlbumsCount++
+                  }
+                  
+                  return acc
+                }, { 
+                  playlistCount: 0, 
+                  albumCount: 0, 
+                  songCount: 0,
+                  madeForYouCount: 0,
+                  recentlyPlayedCount: 0,
+                  popularAlbumsCount: 0
+                })
+                
+                console.log(`Table ${tableName} content analysis:`, contentAnalysis)
+                
+                // INTELLIGENT SECTION ASSIGNMENT
+                let assignedSection = null
+                
+                // Priority 1: Table name-based mapping
+                if (isRecentlyPlayed) {
+                  assignedSection = 'recently_played'
+                  console.log(`Mapping table ${tableName} to Recently Played (table name)`);
+                } else if (isMadeForYou) {
+                  assignedSection = 'made_for_you'
+                  console.log(`Mapping table ${tableName} to Made For You (table name)`);
+                } else if (isPopularAlbums) {
+                  assignedSection = 'popular_albums'
+                  console.log(`Mapping table ${tableName} to Popular Albums (table name)`);
                 }
-                // Check if this table is intended for "Made For You" section
-                else if (tableNameLower.includes('made') || 
-                         tableNameLower.includes('for') || 
-                         tableNameLower.includes('you') ||
-                         tableNameLower.includes('personal') ||
-                         tableNameLower.includes('recommend') ||
-                         tableNameLower.includes('playlist') ||
-                         tableNameLower.includes('mix') ||
-                         tableNameLower.includes('weekly') ||
-                         tableNameLower.includes('daily')) {
-                  console.log(`Mapping table ${tableName} to Made For You section`)
-                  madeForYouData.push(...mappedData)
-                }
-                // Check if this table is intended for "Popular Albums" section
-                else if (tableNameLower.includes('popular') || 
-                         tableNameLower.includes('album') || 
-                         tableNameLower.includes('trending') ||
-                         tableNameLower.includes('chart') ||
-                         tableNameLower.includes('hit') ||
-                         tableNameLower.includes('top') ||
-                         tableNameLower.includes('new') ||
-                         tableNameLower.includes('release')) {
-                  console.log(`Mapping table ${tableName} to Popular Albums section`)
-                  popularAlbumsData.push(...mappedData)
-                }
-                // Default: distribute evenly if we can't determine the intended section
-                else {
-                  console.log(`Could not determine section for table ${tableName}, distributing evenly`)
-                  allMusicData.push(...mappedData)
+                // Priority 2: Content-based mapping with enhanced analysis
+                else if (contentAnalysis.madeForYouCount > 0) {
+                  assignedSection = 'made_for_you'
+                  console.log(`Mapping table ${tableName} to Made For You (content analysis - made for you patterns)`);
+                } else if (contentAnalysis.playlistCount > contentAnalysis.songCount && contentAnalysis.playlistCount > contentAnalysis.albumCount) {
+                  assignedSection = 'made_for_you'
+                  console.log(`Mapping table ${tableName} to Made For You (content analysis - playlists)`);
+                } else if (contentAnalysis.popularAlbumsCount > 0 || (contentAnalysis.albumCount > contentAnalysis.songCount && contentAnalysis.albumCount > contentAnalysis.playlistCount)) {
+                  assignedSection = 'popular_albums'
+                  console.log(`Mapping table ${tableName} to Popular Albums (content analysis - albums)`);
+                } else if (contentAnalysis.recentlyPlayedCount > 0 || contentAnalysis.songCount > 0) {
+                  assignedSection = 'recently_played'
+                  console.log(`Mapping table ${tableName} to Recently Played (content analysis - songs)`);
                 }
                 
-                console.log(`Added ${mappedData.length} items from table ${tableName}:`, mappedData)
+                // Assign data to appropriate section
+                if (assignedSection === 'recently_played') {
+                  recentlyPlayedData.push(...mappedData)
+                } else if (assignedSection === 'made_for_you') {
+                  madeForYouData.push(...mappedData)
+                } else if (assignedSection === 'popular_albums') {
+                  popularAlbumsData.push(...mappedData)
+                } else {
+                  // Unassigned data - will be distributed evenly
+                  unassignedData.push(...mappedData)
+                  console.log(`Could not determine section for table ${tableName}, adding to unassigned`);
+                }
+                
+                console.log(`Added ${mappedData.length} items from table ${tableName} to ${assignedSection || 'unassigned'}`);
               }
             }
           }
         }
         
-        console.log('All collected music data:', allMusicData)
-        console.log('Recently Played Data:', recentlyPlayedData)
-        console.log('Made For You Data:', madeForYouData)
-        console.log('Popular Albums Data:', popularAlbumsData)
+        console.log('Final data distribution:')
+        console.log('Recently played:', recentlyPlayedData.length, 'items')
+        console.log('Made for you:', madeForYouData.length, 'items')
+        console.log('Popular albums:', popularAlbumsData.length, 'items')
+        console.log('Unassigned:', unassignedData.length, 'items')
         
-        // If we have data mapped to specific sections, use that
-        // Otherwise, distribute the remaining data evenly
-        if (recentlyPlayedData.length > 0 || madeForYouData.length > 0 || popularAlbumsData.length > 0) {
-          // If any section is empty, distribute some of the general data to it
-          if (recentlyPlayedData.length === 0 && allMusicData.length > 0) {
-            const chunkSize = Math.ceil(allMusicData.length / 3)
-            recentlyPlayedData.push(...allMusicData.slice(0, chunkSize))
-          }
-          if (madeForYouData.length === 0 && allMusicData.length > 0) {
-            const chunkSize = Math.ceil(allMusicData.length / 3)
-            const startIndex = Math.ceil(allMusicData.length / 3)
-            madeForYouData.push(...allMusicData.slice(startIndex, startIndex + chunkSize))
-          }
-          if (popularAlbumsData.length === 0 && allMusicData.length > 0) {
-            const chunkSize = Math.ceil(allMusicData.length / 3)
-            const startIndex = Math.ceil(allMusicData.length / 3) * 2
-            popularAlbumsData.push(...allMusicData.slice(startIndex))
+        // DISTRIBUTE UNASSIGNED DATA INTELLIGENTLY
+        if (unassignedData.length > 0) {
+          console.log('Distributing unassigned data intelligently...')
+          
+          // If any section is empty, prioritize filling it
+          if (recentlyPlayedData.length === 0 && unassignedData.length > 0) {
+            const chunkSize = Math.min(6, Math.ceil(unassignedData.length / 3))
+            recentlyPlayedData.push(...unassignedData.splice(0, chunkSize))
+            console.log(`Filled Recently Played with ${chunkSize} items`)
           }
           
-          console.log('Final distribution:')
-          console.log('Recently played:', recentlyPlayedData.length, 'items')
-          console.log('Made for you:', madeForYouData.length, 'items')
-          console.log('Popular albums:', popularAlbumsData.length, 'items')
+          if (madeForYouData.length === 0 && unassignedData.length > 0) {
+            const chunkSize = Math.min(6, Math.ceil(unassignedData.length / 2))
+            madeForYouData.push(...unassignedData.splice(0, chunkSize))
+            console.log(`Filled Made For You with ${chunkSize} items`)
+          }
           
-          setRecentlyPlayed(recentlyPlayedData)
-          setMadeForYou(madeForYouData)
-          setPopularAlbums(popularAlbumsData)
-        } else {
-          // No specific mapping found, distribute evenly
-          console.log('No specific section mapping found, distributing evenly')
-          const chunkSize = Math.ceil(allMusicData.length / 3)
-          const evenlyDistributedRecentlyPlayed = allMusicData.slice(0, chunkSize)
-          const evenlyDistributedMadeForYou = allMusicData.slice(chunkSize, chunkSize * 2)
-          const evenlyDistributedPopularAlbums = allMusicData.slice(chunkSize * 2)
+          if (popularAlbumsData.length === 0 && unassignedData.length > 0) {
+            const chunkSize = Math.min(6, unassignedData.length)
+            popularAlbumsData.push(...unassignedData.splice(0, chunkSize))
+            console.log(`Filled Popular Albums with ${chunkSize} items`)
+          }
           
-          setRecentlyPlayed(evenlyDistributedRecentlyPlayed)
-          setMadeForYou(evenlyDistributedMadeForYou)
-          setPopularAlbums(evenlyDistributedPopularAlbums)
+          // Distribute remaining data evenly
+          if (unassignedData.length > 0) {
+            const chunkSize = Math.ceil(unassignedData.length / 3)
+            recentlyPlayedData.push(...unassignedData.slice(0, chunkSize))
+            madeForYouData.push(...unassignedData.slice(chunkSize, chunkSize * 2))
+            popularAlbumsData.push(...unassignedData.slice(chunkSize * 2))
+            console.log(`Evenly distributed remaining ${unassignedData.length} items`)
+          }
         }
         
+        console.log('Final distribution after intelligent mapping:')
+        console.log('Recently played:', recentlyPlayedData.length, 'items')
+        console.log('Made for you:', madeForYouData.length, 'items')
+        console.log('Popular albums:', popularAlbumsData.length, 'items')
+        
+        setRecentlyPlayed(recentlyPlayedData)
+        setMadeForYou(madeForYouData)
+        setPopularAlbums(popularAlbumsData)
         setLoading(false)
         
       } catch (error) {
@@ -544,9 +652,9 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           {recentlyPlayed.map((item, index) => (
             <MusicCard
               key={index}
-              title={item.title || item.song_name || item.track_name || item.albumname || item.name || 'Unknown Track'}
-              artist={item.artist || item.artist_name || 'Unknown Artist'}
-              image={item.image || item.cover_image || item.album_cover || item.image_url || "https://via.placeholder.com/300x300/1db954/ffffff?text=Music"}
+              title={(item as any).title || (item as any).song_name || (item as any).track_name || (item as any).albumname || (item as any).name || 'Unknown Track'}
+              artist={(item as any).artist || (item as any).artist_name || 'Unknown Artist'}
+              image={(item as any).image || (item as any).cover_image || (item as any).album_cover || (item as any).image_url || "https://via.placeholder.com/300x300/1db954/ffffff?text=Music"}
               onPlay={() => handlePlayTrack(item)}
             />
           ))}
@@ -592,9 +700,9 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           {fallbackMadeForYou.map((item, index) => (
             <MusicCard
               key={index}
-              title={item.title || item.song_name || item.track_name || item.albumname || item.name || 'Unknown Track'}
-              artist={item.artist || item.artist_name || 'Unknown Artist'}
-              image={item.image || item.cover_image || item.album_cover || item.image_url || "https://via.placeholder.com/300x300/1db954/ffffff?text=Music"}
+              title={(item as any).title || (item as any).song_name || (item as any).track_name || (item as any).albumname || (item as any).name || 'Unknown Track'}
+              artist={(item as any).artist || (item as any).artist_name || 'Unknown Artist'}
+              image={(item as any).image || (item as any).cover_image || (item as any).album_cover || (item as any).image_url || "https://via.placeholder.com/300x300/1db954/ffffff?text=Music"}
               onPlay={() => handlePlayTrack(item)}
             />
           ))}
@@ -609,9 +717,9 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           {madeForYou.map((item, index) => (
             <MusicCard
               key={index}
-              title={item.title || item.song_name || item.track_name || item.albumname || item.name || 'Unknown Track'}
-              artist={item.artist || item.artist_name || 'Unknown Artist'}
-              image={item.image || item.cover_image || item.album_cover || item.image_url || "https://via.placeholder.com/300x300/1db954/ffffff?text=Music"}
+              title={(item as any).title || (item as any).song_name || (item as any).track_name || (item as any).albumname || (item as any).name || 'Unknown Track'}
+              artist={(item as any).artist || (item as any).artist_name || 'Unknown Artist'}
+              image={(item as any).image || (item as any).cover_image || (item as any).album_cover || (item as any).image_url || "https://via.placeholder.com/300x300/1db954/ffffff?text=Music"}
               onPlay={() => handlePlayTrack(item)}
             />
           ))}
