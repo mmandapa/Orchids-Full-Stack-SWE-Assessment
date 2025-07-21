@@ -128,46 +128,171 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
         
         // Collect ALL music data from ALL tables dynamically
         const allMusicData: any[] = []
+        const recentlyPlayedData: any[] = []
+        const madeForYouData: any[] = []
+        const popularAlbumsData: any[] = []
         
         for (const [tableName, data] of Object.entries(allData)) {
           if (data.length > 0) {
-            // Check if this table has music-related columns
+            // Check if this table has ANY data that could be music-related
             const firstRow = data[0]
-            const hasMusicData = firstRow && (
-              firstRow.title || firstRow.song_name || firstRow.track_name ||
-              firstRow.artist || firstRow.artist_name ||
-              firstRow.album || firstRow.album_name || firstRow.albumname ||
-              firstRow.name // Generic name field
-            )
-            
-            if (hasMusicData) {
-              // Map the data to a consistent structure
-              const mappedData = data.map(item => ({
-                title: item.title || item.song_name || item.track_name || item.albumname || item.name || 'Unknown Track',
-                artist: item.artist || item.artist_name || 'Unknown Artist',
-                image: item.cover_image || item.album_cover || item.image_url || item.image || "https://via.placeholder.com/300x300/1db954/ffffff?text=Music",
-                id: item.id || Math.random().toString(),
-                ...item // Keep all original fields
-              }))
+            if (firstRow) {
+              // Get all column names from the first row
+              const columns = Object.keys(firstRow)
               
-              allMusicData.push(...mappedData)
-              console.log(`Found music data in table ${tableName}:`, mappedData.length, 'items')
+              // Look for any column that might contain music data
+              const hasMusicData = columns.some(col => {
+                const colLower = col.toLowerCase()
+                return colLower.includes('name') || 
+                       colLower.includes('title') || 
+                       colLower.includes('artist') || 
+                       colLower.includes('song') || 
+                       colLower.includes('album') || 
+                       colLower.includes('track') || 
+                       colLower.includes('playlist') || 
+                       colLower.includes('music') || 
+                       colLower.includes('id') ||
+                       colLower.includes('image') ||
+                       colLower.includes('cover') ||
+                       colLower.includes('duration') ||
+                       colLower.includes('time')
+              })
+              
+              if (hasMusicData) {
+                console.log(`Found music data in table: ${tableName}`, data)
+                
+                // Helper to always prefer real values over 'Unknown' or IDs
+                function preferReal(val: any, fallback: string) {
+                  if (val && typeof val === 'string' && val.trim() !== '' && 
+                      !val.toLowerCase().includes('id') && 
+                      !val.toLowerCase().includes('unknown') && 
+                      !val.toLowerCase().includes('test') &&
+                      val.length > 1) {
+                    return val
+                  }
+                  return fallback
+                }
+
+                // Map the data to a consistent structure, always preferring titles/names over IDs
+                const mappedData = data.map(item => {
+                  const columns = Object.keys(item)
+                  
+                  // Find the best title/name field
+                  let title = ''
+                  if (item.title) title = item.title
+                  else if (item.song_name) title = item.song_name
+                  else if (item.track_name) title = item.track_name
+                  else if (item.name) title = item.name
+                  else if (item.album) title = item.album
+                  else if (item.album_name) title = item.album_name
+                  else title = 'Unknown Title'
+                  
+                  // Find the best artist field
+                  let artist = ''
+                  if (item.artist) artist = item.artist
+                  else if (item.artist_name) artist = item.artist_name
+                  else if (item.creator) artist = item.creator
+                  else artist = 'Unknown Artist'
+                  
+                  // Find the best album field
+                  let album = ''
+                  if (item.album) album = item.album
+                  else if (item.album_name) album = item.album_name
+                  else if (item.albumname) album = item.albumname
+                  else album = 'Unknown Album'
+                  
+                  // Find the best image field
+                  let image = ''
+                  if (item.image) image = item.image
+                  else if (item.cover_image) image = item.cover_image
+                  else if (item.cover) image = item.cover
+                  else image = 'https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png'
+                  
+                  return {
+                    id: item.id || Math.random().toString(),
+                    title: preferReal(title, 'Unknown Title'),
+                    artist: preferReal(artist, 'Unknown Artist'),
+                    album: preferReal(album, 'Unknown Album'),
+                    image: image,
+                    duration: item.duration || Math.floor(Math.random() * 300) + 120
+                  }
+                })
+                
+                // Intelligently map tables to UI sections based on table name and content
+                const tableNameLower = tableName.toLowerCase()
+                
+                // Check if this table is intended for "Recently Played" section
+                if (tableNameLower.includes('recent') || 
+                    tableNameLower.includes('played') || 
+                    tableNameLower.includes('listened') ||
+                    tableNameLower.includes('history') ||
+                    tableNameLower.includes('song') ||
+                    tableNameLower.includes('track')) {
+                  console.log(`Mapping table ${tableName} to Recently Played section`)
+                  recentlyPlayedData.push(...mappedData)
+                }
+                // Check if this table is intended for "Made For You" section
+                else if (tableNameLower.includes('made') || 
+                         tableNameLower.includes('for') || 
+                         tableNameLower.includes('you') ||
+                         tableNameLower.includes('personal') ||
+                         tableNameLower.includes('recommend') ||
+                         tableNameLower.includes('playlist') ||
+                         tableNameLower.includes('mix') ||
+                         tableNameLower.includes('weekly') ||
+                         tableNameLower.includes('daily')) {
+                  console.log(`Mapping table ${tableName} to Made For You section`)
+                  madeForYouData.push(...mappedData)
+                }
+                // Check if this table is intended for "Popular Albums" section
+                else if (tableNameLower.includes('popular') || 
+                         tableNameLower.includes('album') || 
+                         tableNameLower.includes('trending') ||
+                         tableNameLower.includes('chart') ||
+                         tableNameLower.includes('hit') ||
+                         tableNameLower.includes('top') ||
+                         tableNameLower.includes('new') ||
+                         tableNameLower.includes('release')) {
+                  console.log(`Mapping table ${tableName} to Popular Albums section`)
+                  popularAlbumsData.push(...mappedData)
+                }
+                // Default: distribute evenly if we can't determine the intended section
+                else {
+                  console.log(`Could not determine section for table ${tableName}, distributing evenly`)
+                  allMusicData.push(...mappedData)
+                }
+                
+                console.log(`Added ${mappedData.length} items from table ${tableName}:`, mappedData)
+              }
             }
           }
         }
         
-        console.log('Total music items found:', allMusicData.length)
-        console.log('Sample data:', allMusicData.slice(0, 2))
+        console.log('All collected music data:', allMusicData)
+        console.log('Recently Played Data:', recentlyPlayedData)
+        console.log('Made For You Data:', madeForYouData)
+        console.log('Popular Albums Data:', popularAlbumsData)
         
-        // Distribute ALL music data dynamically across the three sections
-        if (allMusicData.length > 0) {
-          // Split data into three sections evenly
-          const chunkSize = Math.ceil(allMusicData.length / 3)
-          const recentlyPlayedData = allMusicData.slice(0, chunkSize)
-          const madeForYouData = allMusicData.slice(chunkSize, chunkSize * 2)
-          const popularAlbumsData = allMusicData.slice(chunkSize * 2)
+        // If we have data mapped to specific sections, use that
+        // Otherwise, distribute the remaining data evenly
+        if (recentlyPlayedData.length > 0 || madeForYouData.length > 0 || popularAlbumsData.length > 0) {
+          // If any section is empty, distribute some of the general data to it
+          if (recentlyPlayedData.length === 0 && allMusicData.length > 0) {
+            const chunkSize = Math.ceil(allMusicData.length / 3)
+            recentlyPlayedData.push(...allMusicData.slice(0, chunkSize))
+          }
+          if (madeForYouData.length === 0 && allMusicData.length > 0) {
+            const chunkSize = Math.ceil(allMusicData.length / 3)
+            const startIndex = Math.ceil(allMusicData.length / 3)
+            madeForYouData.push(...allMusicData.slice(startIndex, startIndex + chunkSize))
+          }
+          if (popularAlbumsData.length === 0 && allMusicData.length > 0) {
+            const chunkSize = Math.ceil(allMusicData.length / 3)
+            const startIndex = Math.ceil(allMusicData.length / 3) * 2
+            popularAlbumsData.push(...allMusicData.slice(startIndex))
+          }
           
-          console.log('Distributing music data across sections:')
+          console.log('Final distribution:')
           console.log('Recently played:', recentlyPlayedData.length, 'items')
           console.log('Made for you:', madeForYouData.length, 'items')
           console.log('Popular albums:', popularAlbumsData.length, 'items')
@@ -176,11 +301,16 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
           setMadeForYou(madeForYouData)
           setPopularAlbums(popularAlbumsData)
         } else {
-          // No music data found, use fallbacks
-          console.log('No music data found, using fallbacks')
-          setRecentlyPlayed([])
-          setMadeForYou([])
-          setPopularAlbums([])
+          // No specific mapping found, distribute evenly
+          console.log('No specific section mapping found, distributing evenly')
+          const chunkSize = Math.ceil(allMusicData.length / 3)
+          const evenlyDistributedRecentlyPlayed = allMusicData.slice(0, chunkSize)
+          const evenlyDistributedMadeForYou = allMusicData.slice(chunkSize, chunkSize * 2)
+          const evenlyDistributedPopularAlbums = allMusicData.slice(chunkSize * 2)
+          
+          setRecentlyPlayed(evenlyDistributedRecentlyPlayed)
+          setMadeForYou(evenlyDistributedMadeForYou)
+          setPopularAlbums(evenlyDistributedPopularAlbums)
         }
         
         setLoading(false)
@@ -283,26 +413,26 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
     },
     { 
       id: "10",
-      title: "Daily Mix 2", 
-      artist: "Arctic Monkeys, The Strokes, Tame Impala and more",
-      album: "Indie Rock Mix",
+      title: "On Repeat", 
+      artist: "Songs you can't stop playing",
+      album: "Your Favorites",
       image: "https://v3.fal.media/files/rabbit/tAQ6AzJJdlEZW-y4eNdxO_output.png",
       duration: 240
     },
     { 
       id: "11",
-      title: "Daily Mix 3", 
-      artist: "Taylor Swift, Olivia Rodrigo, Gracie Abrams and more",
-      album: "Pop Mix",
-      image: "https://v3.fal.media/files/rabbit/b11V_uidRMsa2mTr5mCfz_output.png",
-      duration: 190
+      title: "Time Capsule", 
+      artist: "We made you a personalized playlist with songs to take you back in time",
+      album: "Nostalgia Mix",
+      image: "https://v3.fal.media/files/kangaroo/0OgdfDAzLEbkda0m7uLJw_output.png",
+      duration: 205
     },
     { 
       id: "12",
-      title: "On Repeat", 
-      artist: "The songs you can't get enough of",
-      album: "Your Favorites",
-      image: "https://v3.fal.media/files/rabbit/mVegWQYIe0yj8NixTQQG-_output.png",
+      title: "Daily Mix 2", 
+      artist: "Drake, Travis Scott, Post Malone and more",
+      album: "Hip-Hop Mix",
+      image: "https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png",
       duration: 220
     }
   ]
@@ -313,64 +443,48 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
       title: "Midnights", 
       artist: "Taylor Swift",
       album: "Midnights",
-      image: "https://v3.fal.media/files/elephant/C_rLsEbIUdbn6nQ0wz14S_output.png",
-      duration: 275
+      image: "https://v3.fal.media/files/kangaroo/HRayeBi01JIqfkCjjoenp_output.png",
+      duration: 210
     },
     { 
       id: "14",
       title: "Harry's House", 
       artist: "Harry Styles",
       album: "Harry's House",
-      image: "https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png",
-      duration: 245
+      image: "https://v3.fal.media/files/panda/q7hWJCgH2Fy4cJdWqAzuk_output.png",
+      duration: 195
     },
     { 
       id: "15",
-      title: "Un Verano Sin Ti", 
-      artist: "Bad Bunny",
-      album: "Un Verano Sin Ti",
-      image: "https://v3.fal.media/files/kangaroo/HRayeBi01JIqfkCjjoenp_output.png",
-      duration: 265
+      title: "Astroworld", 
+      artist: "Travis Scott",
+      album: "Astroworld",
+      image: "https://v3.fal.media/files/elephant/N5qDbXOpqAlIcK7kJ4BBp_output.png",
+      duration: 225
     },
     { 
       id: "16",
-      title: "Renaissance", 
-      artist: "Beyoncé",
-      album: "Renaissance",
-      image: "https://v3.fal.media/files/elephant/N5qDbXOpqAlIcK7kJ4BBp_output.png",
-      duration: 290
-    },
-    { 
-      id: "17",
-      title: "SOUR", 
-      artist: "Olivia Rodrigo",
-      album: "SOUR",
-      image: "https://v3.fal.media/files/rabbit/tAQ6AzJJdlEZW-y4eNdxO_output.png",
-      duration: 215
-    },
-    { 
-      id: "18",
-      title: "Folklore", 
-      artist: "Taylor Swift",
-      album: "Folklore",
-      image: "https://v3.fal.media/files/rabbit/b11V_uidRMsa2mTr5mCfz_output.png",
-      duration: 285
-    },
-    { 
-      id: "19",
-      title: "Fine Line", 
-      artist: "Harry Styles",
-      album: "Fine Line",
-      image: "https://v3.fal.media/files/panda/q7hWJCgH2Fy4cJdWqAzuk_output.png",
-      duration: 255
-    },
-    { 
-      id: "20",
       title: "After Hours", 
       artist: "The Weeknd",
       album: "After Hours",
+      image: "https://v3.fal.media/files/rabbit/tAQ6AzJJdlEZW-y4eNdxO_output.png",
+      duration: 240
+    },
+    { 
+      id: "17",
+      title: "Scorpion", 
+      artist: "Drake",
+      album: "Scorpion",
       image: "https://v3.fal.media/files/kangaroo/0OgdfDAzLEbkda0m7uLJw_output.png",
-      duration: 270
+      duration: 205
+    },
+    { 
+      id: "18",
+      title: "Happier Than Ever", 
+      artist: "Billie Eilish",
+      album: "Happier Than Ever",
+      image: "https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png",
+      duration: 220
     }
   ]
 

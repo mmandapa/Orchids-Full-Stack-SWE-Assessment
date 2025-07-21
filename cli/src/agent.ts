@@ -343,55 +343,84 @@ IMPORTANT RULES:
 4. Use the exact table schemas provided - do not make up column names
 5. When creating new tables, use sensible column names and data types
 6. When inserting data, use the exact column names from the table schema
-7. You can modify the frontend UI components to display new data
-8. You can drop tables and recreate them if needed
-9. Always provide sample data when creating new tables
-10. When creating music-related tables, use column names like: song_name, artist_name, album_name, duration, image_url, etc.
+7. You can modify the frontend UI component to display data from any table structure
 
-CRITICAL: When generating music data, ALWAYS use REAL artist names, album titles, and song names like you would see on actual Spotify. NEVER use generic placeholders like "Album 1", "Artist A", "Song 1", etc.
+CRITICAL DATA RULES:
+- ALWAYS generate REAL artist names, song titles, and album names - NEVER use test names, placeholders, or generic names
+- ALWAYS display the SONG TITLE, ARTIST NAME, or ALBUM NAME in the UI - NEVER display IDs or technical identifiers
+- Examples of REAL data to generate:
+  * Artists: "Taylor Swift", "Drake", "The Weeknd", "Bad Bunny", "Ed Sheeran", "Ariana Grande", "Post Malone", "Billie Eilish"
+  * Songs: "Cruel Summer", "Flowers", "Last Night", "Vampire", "Kill Bill", "Anti-Hero", "As It Was", "Unholy"
+  * Albums: "Midnights", "SOS", "One Thing at a Time", "GUTS", "Renaissance", "Un Verano Sin Ti", "= (Equals)", "Happier Than Ever"
+  * Playlists: "Today's Top Hits", "RapCaviar", "All Out 2010s", "Rock Classics", "Chill Hits", "Peaceful Piano", "Deep Focus", "Instrumental Study"
 
-DYNAMIC FRONTEND INTEGRATION:
-The frontend automatically detects and displays music data from ANY table that has music-related columns (song_name, artist_name, title, album, etc.). You don't need to worry about specific table names - just create tables with music data and the frontend will automatically:
-- Detect tables with music data
-- Map the data to a consistent structure
-- Distribute the data across the three UI sections (Recently played, Made For You, Popular albums)
-- Display real artist names and song titles
+SPOTIFY UI STRUCTURE - UNDERSTAND THE LAYOUT:
+The frontend has EXACTLY THREE main sections that display music data in this specific order:
 
-Examples of REAL data to use:
-- Artists: Travis Scott, Taylor Swift, Drake, Billie Eilish, The Weeknd, Ariana Grande, Post Malone, Ed Sheeran, etc.
-- Albums: "Astroworld", "Midnights", "Scorpion", "Happier Than Ever", "After Hours", "Positions", "Hollywood's Bleeding", "Divide", etc.
-- Songs: "SICKO MODE", "Anti-Hero", "God's Plan", "bad guy", "Blinding Lights", "positions", "Circles", "Shape of You", etc.
-- Playlists: "Discover Weekly", "Release Radar", "Daily Mix 1", "Chill Hits", "Top 50 - Global", "On Repeat", etc.
+1. "Recently Played" section (FIRST section)
+   - Shows recently listened songs, albums, and playlists
+   - Contains individual tracks, albums, or playlists the user has recently played
+   - Examples: "Cruel Summer - Taylor Swift", "Midnights - Taylor Swift", "Today's Top Hits - Spotify"
 
-Sample INSERT statements with REAL data:
-INSERT INTO songs (song_name, artist_name, album_name) VALUES ('SICKO MODE', 'Travis Scott', 'Astroworld');
-INSERT INTO songs (song_name, artist_name, album_name) VALUES ('Anti-Hero', 'Taylor Swift', 'Midnights');
-INSERT INTO songs (song_name, artist_name, album_name) VALUES ('Blinding Lights', 'The Weeknd', 'After Hours');
-INSERT INTO songs (song_name, artist_name, album_name) VALUES ('bad guy', 'Billie Eilish', 'When We All Fall Asleep, Where Do We Go?');
-INSERT INTO songs (song_name, artist_name, album_name) VALUES ('God\'s Plan', 'Drake', 'Scorpion');
+2. "Made For You" section (SECOND section)  
+   - Shows personalized playlists, daily mixes, and recommendations
+   - Contains curated playlists and personalized content
+   - Examples: "Daily Mix 1 - Spotify", "Discover Weekly - Spotify", "Release Radar - Spotify"
 
-EXISTING TABLES (USE THESE IF THEY EXIST):
-${context.existingTables.length > 0 ? context.existingTables.map(table => `- ${table}`).join('\n') : 'No tables exist yet'}
+3. "Popular Albums" section (THIRD section)
+   - Shows trending albums, new releases, and popular music
+   - Contains popular albums and new releases
+   - Examples: "SOS - SZA", "One Thing at a Time - Morgan Wallen", "GUTS - Olivia Rodrigo"
 
-EXISTING TABLE SCHEMAS:
-${context.existingTableSchemas}
+USER QUERY MAPPING - MATCH REQUESTS TO CORRECT SECTIONS:
+When users make requests, you MUST identify which UI section they're referring to and update the correct section:
 
-CONTEXT FROM STATIC DATA:
-The original Spotify UI shows these sections with proper labels and descriptions:
-- "Recently played" section with songs like "Liked Songs", "Discover Weekly", "Release Radar"
-- "Made For You" section with playlists like "Discover Weekly" (Your weekly mixtape of fresh music), "Release Radar" (Catch all the latest music from artists you follow), "Daily Mix 1" (Billie Eilish, Lorde, Clairo and more)
-- "Popular albums" section with albums like "Midnights" by Taylor Swift, "Harry's House" by Harry Styles
+KEYWORDS THAT MAP TO "Recently Played" (FIRST section):
+- "recently played" / "recent" / "played" / "recently listened" / "recently played songs"
+- "songs" / "tracks" / "music" (when context suggests recent activity)
+- "individual songs" / "recent tracks" / "what I played"
+- "my recent music" / "recently played albums"
 
-When creating music data, ensure it has proper song names and artist names like normal Spotify, with descriptive text and proper formatting.
+KEYWORDS THAT MAP TO "Made For You" (SECOND section):
+- "made for you" / "made" / "for you" / "personalized" / "recommendations"
+- "playlists" / "daily mix" / "discover weekly" / "release radar"
+- "curated" / "personalized playlists" / "recommended"
+- "daily mixes" / "discover" / "weekly" / "radar"
 
-You can:
-1. Create new tables with appropriate schemas
-2. Insert sample data into tables
-3. Query existing tables
-4. Modify the frontend to display new data
-5. Drop tables and recreate them if needed
+KEYWORDS THAT MAP TO "Popular Albums" (THIRD section):
+- "popular albums" / "popular" / "albums" / "trending" / "new releases"
+- "trending albums" / "popular music" / "new albums"
+- "top albums" / "charting albums" / "hit albums"
 
-Remember: Only work with tables that actually exist, and always create tables before inserting data. ALWAYS use REAL artist names, album titles, and song names - never generic placeholders. The frontend will automatically detect and display any music data you create.`
+EXAMPLES OF CORRECT MAPPING:
+- User says "create a table with recently played songs" → Update "Recently Played" section (FIRST)
+- User says "add some made for you playlists" → Update "Made For You" section (SECOND)  
+- User says "update popular albums" → Update "Popular Albums" section (THIRD)
+- User says "add songs to recently played" → Update "Recently Played" section (FIRST)
+- User says "create playlists for made for you" → Update "Made For You" section (SECOND)
+
+CRITICAL: When a user asks to update a specific section, you MUST:
+1. Identify which of the THREE UI sections they're referring to
+2. Create or update a table with data appropriate for that specific section
+3. Use table names that clearly indicate the section (e.g., "recently_played_songs", "made_for_you_playlists", "popular_albums")
+4. Generate data that fits the style and content type of that specific section
+5. The frontend will automatically detect and display the data in the correct section
+
+ORIGINAL SPOTIFY UI CONTEXT:
+The frontend has three main sections that should always be populated with real Spotify-like content:
+1. "Recently Played" - Shows recently listened songs, albums, and playlists
+2. "Made For You" - Shows personalized playlists, daily mixes, and recommendations  
+3. "Popular Albums" - Shows trending albums, new releases, and popular music
+
+ALWAYS use the original Spotify UI as your reference for:
+- What type of content belongs in each section
+- How to structure the data (title, artist, album, cover image)
+- What labels and descriptions to use
+- The overall user experience and data presentation
+
+When creating or updating data, ensure it fits the original UI's style and content type for each section. The frontend will automatically adapt to any table structure you create, but you must provide real, Spotify-like data that matches the original UI's expectations.
+
+Remember: The frontend is completely dynamic and will work with ANY table structure you create. Just focus on generating real music data and matching user queries to the correct UI sections.`
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
