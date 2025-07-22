@@ -176,46 +176,122 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
                 const mappedData = data.map(item => {
                   const columns = Object.keys(item)
                   
-                  // Find the best title/name field
-                  let title = ''
-                  if (item.title) title = item.title
-                  else if (item.song_name) title = item.song_name
-                  else if (item.track_name) title = item.track_name
-                  else if (item.name) title = item.name
-                  else if (item.album) title = item.album
-                  else if (item.album_name) title = item.album_name
-                  else title = 'Unknown Title'
+                  // INTELLIGENT FIELD MAPPING based on table structure
+                  const hasDescription = 'description' in item
+                  const hasType = 'type' in item
+                  const hasArtist = 'artist' in item
+                  const hasAlbum = 'album' in item
+                  const hasCoverImage = 'cover_image' in item
                   
-                  // Find the best artist field
-                  let artist = ''
-                  if (item.artist) artist = item.artist
-                  else if (item.artist_name) artist = item.artist_name
-                  else if (item.creator) artist = item.creator
-                  else artist = 'Unknown Artist'
+                  // Debug logging for Made for you items
+                  if (hasDescription && hasType) {
+                    console.log('🔍 MADE FOR YOU ITEM DETECTED:', {
+                      title: item.title,
+                      description: item.description,
+                      type: item.type,
+                      image_url: item.image_url
+                    })
+                  }
                   
-                  // Find the best album field
-                  let album = ''
-                  if (item.album) album = item.album
-                  else if (item.album_name) album = item.album_name
-                  else if (item.albumname) album = item.albumname
-                  else album = 'Unknown Album'
+                  // MADE FOR YOU TABLE (has description and type fields)
+                  if (hasDescription && hasType) {
+                    return {
+                      id: item.id || Math.random().toString(),
+                      title: preferReal(item.title, 'Unknown Playlist'),
+                      artist: preferReal(item.description, 'Playlist Description'), // Use description as artist field
+                      album: preferReal(item.type, 'Playlist Type'), // Use type as album field
+                      image: item.image_url || item.image || 'https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png',
+                      duration: item.duration || Math.floor(Math.random() * 300) + 120,
+                      // Preserve original item properties for dynamic access
+                      ...item
+                    }
+                  }
                   
-                  // Find the best image field
-                  let image = ''
-                  if (item.image) image = item.image
-                  else if (item.cover_image) image = item.cover_image
-                  else if (item.cover) image = item.cover
-                  else image = 'https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png'
+                  // MADE FOR YOU TABLE - EXACT ORIGINAL STRUCTURE (artist/album fields)
+                  else if (item.artist && item.album && !item.cover_image) {
+                    return {
+                      id: item.id || Math.random().toString(),
+                      title: preferReal(item.title, 'Unknown Playlist'),
+                      artist: preferReal(item.artist, 'Unknown Artist'), // This is the description
+                      album: preferReal(item.album, 'Unknown Album'), // This is the type
+                      image: item.image || 'https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png',
+                      duration: item.duration || Math.floor(Math.random() * 300) + 120,
+                      // Preserve original item properties for dynamic access
+                      ...item
+                    }
+                  }
                   
-                  return {
-                    id: item.id || Math.random().toString(),
-                    title: preferReal(title, 'Unknown Title'),
-                    artist: preferReal(artist, 'Unknown Artist'),
-                    album: preferReal(album, 'Unknown Album'),
-                    image: image,
-                    duration: item.duration || Math.floor(Math.random() * 300) + 120,
-                    // Preserve original item properties for dynamic access
-                    ...item
+                  // POPULAR ALBUMS TABLE (has cover_image field)
+                  else if (hasCoverImage) {
+                    return {
+                      id: item.id || Math.random().toString(),
+                      title: preferReal(item.title, 'Unknown Album'),
+                      artist: preferReal(item.artist, 'Unknown Artist'),
+                      album: preferReal(item.title, 'Album'), // Use title as album for albums
+                      image: item.cover_image || item.image || 'https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png',
+                      duration: item.duration || Math.floor(Math.random() * 300) + 120,
+                      // Preserve original item properties for dynamic access
+                      ...item
+                    }
+                  }
+                  
+                  // RECENTLY PLAYED TABLE (has artist and album fields)
+                  else if (hasArtist && hasAlbum) {
+                    return {
+                      id: item.id || Math.random().toString(),
+                      title: preferReal(item.title, 'Unknown Track'),
+                      artist: preferReal(item.artist, 'Unknown Artist'),
+                      album: preferReal(item.album, 'Unknown Album'),
+                      image: item.image || 'https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png',
+                      duration: item.duration || Math.floor(Math.random() * 300) + 120,
+                      // Preserve original item properties for dynamic access
+                      ...item
+                    }
+                  }
+                  
+                  // FALLBACK for unknown table structure
+                  else {
+                    // Find the best title field
+                    let title = ''
+                    if (item.title) title = item.title
+                    else if (item.song_name) title = item.song_name
+                    else if (item.track_name) title = item.track_name
+                    else if (item.name) title = item.name
+                    else if (item.album) title = item.album
+                    else if (item.album_name) title = item.album_name
+                    else title = 'Unknown Title'
+                    
+                    // Find the best artist field
+                    let artist = ''
+                    if (item.artist) artist = item.artist
+                    else if (item.artist_name) artist = item.artist_name
+                    else if (item.creator) artist = item.creator
+                    else artist = 'Unknown Artist'
+                    
+                    // Find the best album field
+                    let album = ''
+                    if (item.album) album = item.album
+                    else if (item.album_name) album = item.album_name
+                    else if (item.albumname) album = item.albumname
+                    else album = 'Unknown Album'
+                    
+                    // Find the best image field
+                    let image = ''
+                    if (item.image) image = item.image
+                    else if (item.cover_image) image = item.cover_image
+                    else if (item.cover) image = item.cover
+                    else image = 'https://v3.fal.media/files/panda/kvQ0deOgoUWHP04ajVH3A_output.png'
+                    
+                    return {
+                      id: item.id || Math.random().toString(),
+                      title: preferReal(title, 'Unknown Title'),
+                      artist: preferReal(artist, 'Unknown Artist'),
+                      album: preferReal(album, 'Unknown Album'),
+                      image: image,
+                      duration: item.duration || Math.floor(Math.random() * 300) + 120,
+                      // Preserve original item properties for dynamic access
+                      ...item
+                    }
                   }
                 })
                 
@@ -608,10 +684,10 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
     onPlayTrack?.(track)
   }
 
-  // Use database data if available, otherwise fallback to static data
-  const displayRecentlyPlayed = recentlyPlayed.length > 0 ? recentlyPlayed : fallbackRecentlyPlayed
-  const displayMadeForYou = madeForYou.length > 0 ? madeForYou : fallbackMadeForYou
-  const displayPopularAlbums = popularAlbums.length > 0 ? popularAlbums : fallbackPopularAlbums
+  // Only use database data - no fallback display
+  const displayRecentlyPlayed = recentlyPlayed
+  const displayMadeForYou = madeForYou
+  const displayPopularAlbums = popularAlbums
 
   // Render recently played songs
   const renderRecentlyPlayed = () => {
@@ -631,21 +707,13 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
 
     if (error) {
       return (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-          {fallbackRecentlyPlayed.map((item, index) => (
-            <MusicCard
-              key={index}
-              title={item.title}
-              artist={item.artist}
-              image={item.image}
-              onPlay={() => handlePlayTrack(item)}
-            />
-          ))}
+        <div className="text-center py-8">
+          <p className="text-gray-400">Error loading data. Please try again.</p>
         </div>
       );
     }
 
-    // If we have database data, use it
+    // Only show database data
     if (recentlyPlayed.length > 0) {
       return (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
@@ -662,18 +730,10 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
       );
     }
 
-    // Fallback to static data
+    // Show empty state when no database data
     return (
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-        {fallbackRecentlyPlayed.map((item, index) => (
-          <MusicCard
-            key={index}
-            title={item.title}
-            artist={item.artist}
-            image={item.image}
-            onPlay={() => handlePlayTrack(item)}
-          />
-        ))}
+      <div className="text-center py-8">
+        <p className="text-gray-400">No recently played songs found. Database needs to be populated.</p>
       </div>
     );
   };
@@ -696,21 +756,13 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
 
     if (error) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-          {fallbackMadeForYou.map((item, index) => (
-            <MusicCard
-              key={index}
-              title={(item as any).title || (item as any).song_name || (item as any).track_name || (item as any).albumname || (item as any).name || 'Unknown Track'}
-              artist={(item as any).artist || (item as any).artist_name || 'Unknown Artist'}
-              image={(item as any).image || (item as any).cover_image || (item as any).album_cover || (item as any).image_url || "https://via.placeholder.com/300x300/1db954/ffffff?text=Music"}
-              onPlay={() => handlePlayTrack(item)}
-            />
-          ))}
+        <div className="text-center py-8">
+          <p className="text-gray-400">Error loading data. Please try again.</p>
         </div>
       );
     }
 
-    // If we have database data, use it
+    // Only show database data
     if (madeForYou.length > 0) {
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
@@ -727,18 +779,10 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
       );
     }
 
-    // Fallback to static data
+    // Show empty state when no database data
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-        {fallbackMadeForYou.map((item, index) => (
-          <MusicCard
-            key={index}
-            title={item.title}
-            artist={item.artist}
-            image={item.image}
-            onPlay={() => handlePlayTrack(item)}
-          />
-        ))}
+      <div className="text-center py-8">
+        <p className="text-gray-400">No made for you playlists found. Database needs to be populated.</p>
       </div>
     );
   };
@@ -761,28 +805,13 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
 
     if (error) {
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
-          {fallbackPopularAlbums.map((album, index) => (
-            <div key={index} className="bg-neutral-800/40 rounded-md p-4 hover:bg-neutral-800/60 transition-colors group">
-              <div className="relative">
-                <img 
-                  src={album.image} 
-                  alt={album.title} 
-                  className="w-full aspect-square object-cover rounded-md mb-4"
-                />
-                <button className="absolute bottom-6 right-2 bg-green-500 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="h-4 w-4 text-black" />
-                </button>
-              </div>
-              <h3 className="font-semibold truncate">{album.title}</h3>
-              <p className="text-sm text-neutral-400 truncate">{album.artist}</p>
-            </div>
-          ))}
+        <div className="text-center py-8">
+          <p className="text-gray-400">Error loading data. Please try again.</p>
         </div>
       );
     }
 
-    // If we have database data, use it
+    // Only show database data
     if (popularAlbums.length > 0) {
       return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
@@ -806,25 +835,10 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
       );
     }
 
-    // Fallback to static data
+    // Show empty state when no database data
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4">
-        {fallbackPopularAlbums.map((album, index) => (
-          <div key={index} className="bg-neutral-800/40 rounded-md p-4 hover:bg-neutral-800/60 transition-colors group">
-            <div className="relative">
-              <img 
-                src={album.image} 
-                alt={album.title} 
-                className="w-full aspect-square object-cover rounded-md mb-4"
-              />
-              <button className="absolute bottom-6 right-2 bg-green-500 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Play className="h-4 w-4 text-black" />
-              </button>
-            </div>
-            <h3 className="font-semibold truncate">{album.title}</h3>
-            <p className="text-sm text-neutral-400 truncate">{album.artist}</p>
-          </div>
-        ))}
+      <div className="text-center py-8">
+        <p className="text-gray-400">No popular albums found. Database needs to be populated.</p>
       </div>
     );
   };

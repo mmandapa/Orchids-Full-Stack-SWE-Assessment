@@ -184,6 +184,7 @@ async function analyzeContext(query: string) {
   console.log(chalk.dim('  - Scanning project files'));
   console.log(chalk.dim('  - Checking existing database schema'));
   console.log(chalk.dim('  - Analyzing query requirements'));
+  console.log(chalk.dim('  - Parsing frontend code for music data'));
   
   try {
     // Get current table schemas dynamically
@@ -203,15 +204,20 @@ async function analyzeContext(query: string) {
     
     console.log(chalk.dim('Existing tables:'), existingTables);
     
+    // Parse frontend data
+    const frontendData = await parseFrontendData();
+    
     return {
       existingTables,
-      schemas
+      schemas,
+      frontendData
     };
   } catch (error) {
     console.error(chalk.red('❌ Error analyzing context:'), error);
     return {
       existingTables: [],
-      schemas: ''
+      schemas: '',
+      frontendData: {}
     };
   }
 }
@@ -219,10 +225,29 @@ async function analyzeContext(query: string) {
 // Function to extract SQL commands from AI response
 function extractSqlCommands(response: string): string[] {
   console.log(chalk.blue('🔍 Extracting SQL commands from response...'));
-  const sqlRegex = /```sql\n([\s\S]*?)```/g;
-  const matches = [...response.matchAll(sqlRegex)];
+  console.log(chalk.dim('Response length:'), response.length);
+  
+  // Try different regex patterns
+  const sqlRegex1 = /```sql\n([\s\S]*?)```/g;
+  const sqlRegex2 = /```sql\s*\n([\s\S]*?)```/g;
+  const sqlRegex3 = /```sql([\s\S]*?)```/g;
+  
+  let matches = [...response.matchAll(sqlRegex1)];
+  console.log(chalk.dim('Pattern 1 matches:'), matches.length);
+  
+  if (matches.length === 0) {
+    matches = [...response.matchAll(sqlRegex2)];
+    console.log(chalk.dim('Pattern 2 matches:'), matches.length);
+  }
+  
+  if (matches.length === 0) {
+    matches = [...response.matchAll(sqlRegex3)];
+    console.log(chalk.dim('Pattern 3 matches:'), matches.length);
+  }
+  
   const commands = matches.map(match => {
     const sql = match[1].trim();
+    console.log(chalk.dim('Raw SQL block:'), sql);
     // Split multiple commands if they exist
     return sql.split(';')
       .map(cmd => cmd.trim())
@@ -315,6 +340,86 @@ async function clearAllTables() {
   }
 }
 
+// Function to parse frontend code and extract music data
+async function parseFrontendData() {
+  console.log(chalk.blue('🔍 Parsing frontend code for music data...'));
+  
+  try {
+    // Read the main Spotify component file
+    const frontendPath = join(process.cwd(), 'src/components/spotify-main-content.tsx');
+    const content = await readFile(frontendPath, 'utf8');
+    
+    // Extract fallback data arrays
+    const recentlyPlayedMatch = content.match(/const fallbackRecentlyPlayed = \[([\s\S]*?)\]/);
+    const madeForYouMatch = content.match(/const fallbackMadeForYou = \[([\s\S]*?)\]/);
+    const popularAlbumsMatch = content.match(/const fallbackPopularAlbums = \[([\s\S]*?)\]/);
+    
+    const extractedData: { [key: string]: any[] } = {};
+    
+    if (recentlyPlayedMatch) {
+      const recentlyPlayedData = parseDataArray(recentlyPlayedMatch[1]);
+      extractedData.recentlyPlayed = recentlyPlayedData;
+      console.log(chalk.green(`✅ Extracted ${recentlyPlayedData.length} recently played items`));
+    }
+    
+    if (madeForYouMatch) {
+      const madeForYouData = parseDataArray(madeForYouMatch[1]);
+      extractedData.madeForYou = madeForYouData;
+      console.log(chalk.green(`✅ Extracted ${madeForYouData.length} made for you items`));
+    }
+    
+    if (popularAlbumsMatch) {
+      const popularAlbumsData = parseDataArray(popularAlbumsMatch[1]);
+      extractedData.popularAlbums = popularAlbumsData;
+      console.log(chalk.green(`✅ Extracted ${popularAlbumsData.length} popular albums`));
+    }
+    
+    return extractedData;
+  } catch (error) {
+    console.error(chalk.red('❌ Error parsing frontend data:'), error);
+    return {};
+  }
+}
+
+// Function to parse data array from frontend code
+function parseDataArray(arrayString: string): any[] {
+  const items: any[] = [];
+  
+  // Split by individual objects
+  const objectMatches = arrayString.match(/\{[^}]*\}/g);
+  
+  if (objectMatches) {
+    for (const objectStr of objectMatches) {
+      const item: any = {};
+      
+      // Extract key-value pairs
+      const keyValueMatches = objectStr.match(/(\w+):\s*"([^"]*)"/g);
+      
+      if (keyValueMatches) {
+        for (const kv of keyValueMatches) {
+          const match = kv.match(/(\w+):\s*"([^"]*)"/);
+          if (match) {
+            const [, key, value] = match;
+            item[key] = value;
+          }
+        }
+      }
+      
+      if (Object.keys(item).length > 0) {
+        items.push(item);
+      }
+    }
+  }
+  
+  return items;
+}
+
+// Function to escape SQL strings properly
+function escapeSqlString(str: string): string {
+  if (!str) return '';
+  return str.replace(/'/g, "''").replace(/\\/g, '\\\\');
+}
+
 // Main query processing function
 export async function processQuery(query: string, openai: OpenAI) {
   try {
@@ -343,6 +448,15 @@ IMPORTANT RULES:
 4. When creating new tables, use sensible column names and data types
 5. When inserting data, use the exact column names from the table schema
 6. You can modify the frontend UI component to display data from any table structure
+
+CRITICAL SQL GENERATION RULES:
+- ALWAYS generate COMPLETE SQL statements with REAL data
+- NEVER use placeholders like "..." or "etc." in SQL statements
+- ALWAYS include ALL the data you want to insert in the SQL statement
+- If you need to insert multiple rows, include ALL rows in the INSERT statement
+- NEVER use incomplete SQL statements
+- ALWAYS escape apostrophes in SQL strings by doubling them (e.g., "can't" becomes "can''t")
+- ALWAYS escape backslashes in SQL strings by doubling them (e.g., "path\\file" becomes "path\\\\file")
 
 CRITICAL DATA RULES:
 - ALWAYS generate REAL artist names, song titles, and album names - NEVER use test names, placeholders, or generic names
@@ -435,13 +549,22 @@ For "Popular Albums" - Generate data that represents:
 - Focus on full albums, not individual songs
 
 CRITICAL DATA GENERATION RULES:
-- ALWAYS generate REAL artist names, song titles, and album names
+- ALWAYS use the EXACT data from the frontend fallback arrays (fallbackRecentlyPlayed, fallbackMadeForYou, fallbackPopularAlbums)
+- NEVER generate fake data - use the real data from the frontend code
+- Use the exact titles, artists, and images from the frontend data
 - NEVER use test names, placeholders, or generic names
-- Use current, popular artists and music
 - Make data feel authentic and realistic
 - Match the content type expected for each section
 - Include appropriate descriptive text and context
 - Ensure data fits the Spotify-like experience for each section
+
+FRONTEND DATA TO USE:
+The frontend contains real data in these arrays:
+- fallbackRecentlyPlayed: Contains 6 real playlists/songs with exact titles, artists, and image URLs
+- fallbackMadeForYou: Contains 6 real playlists with exact titles, artists, and image URLs  
+- fallbackPopularAlbums: Contains 6 real albums with exact titles, artists, and image URLs
+
+ALWAYS extract and use this exact data when populating the database.
 
 INTELLIGENT QUERY MAPPING - MATCH REQUESTS TO CORRECT SECTIONS:
 When users make requests, you MUST intelligently identify which UI section they're referring to and update the correct section:
@@ -520,6 +643,13 @@ ALWAYS use the original Spotify UI as your reference for:
 
 When creating or updating data, ensure it fits the original UI's style and content type for each section. The frontend will automatically adapt to any table structure you create, but you must provide real, Spotify-like data that matches the original UI's expectations.
 
+IMPORTANT TABLE SCHEMAS:
+- recently_played_music table: id (SERIAL), title (VARCHAR), artist (VARCHAR), album (VARCHAR), image (VARCHAR)
+- made_for_you_playlists table: id (SERIAL), title (VARCHAR), artist (VARCHAR), album (VARCHAR), image (VARCHAR) - USE EXACT ORIGINAL STRUCTURE
+- popular_albums table: id (SERIAL), title (VARCHAR), artist (VARCHAR), cover_image (VARCHAR), release_date (DATE), total_tracks (INTEGER), popularity (INTEGER), created_at (TIMESTAMP)
+
+ALWAYS use the exact column names from the existing tables when inserting data.
+
 Remember: The frontend is completely dynamic and will work with ANY table structure you create. Just focus on generating real music data and matching user queries to the correct UI sections.`
 
     const completion = await openai.chat.completions.create({
@@ -540,12 +670,17 @@ Remember: The frontend is completely dynamic and will work with ANY table struct
     console.log(chalk.green('\n✨ AI Response Received:'));
     console.log(chalk.dim(aiResponse));
 
+    console.log(chalk.blue('🔍 About to start Step 3...'));
+
     // Step 3: Execute SQL commands
     console.log(chalk.yellow('\n📝 Step 3: Executing Database Changes'));
     const sqlCommands = extractSqlCommands(aiResponse);
+    console.log(chalk.blue(`Found ${sqlCommands.length} SQL commands to execute`));
+    
     if (sqlCommands.length > 0) {
       // Validate SQL commands before execution
       const { valid, invalid } = validateSqlCommands(sqlCommands, context.existingTables);
+      console.log(chalk.blue(`Valid commands: ${valid.length}, Invalid commands: ${invalid.length}`));
       
       if (valid.length === 0) {
         console.log(chalk.red('❌ No valid SQL commands found. All commands referenced non-existent tables.'));
@@ -553,7 +688,9 @@ Remember: The frontend is completely dynamic and will work with ANY table struct
         return;
       }
       
+      console.log(chalk.green('Executing SQL commands...'));
       for (const command of valid) {
+        console.log(chalk.blue(`Executing: ${command}`));
         await executeSql(command);
       }
     } else {
@@ -600,7 +737,29 @@ Remember: The frontend is completely dynamic and will work with ANY table struct
 
     // Step 5: Verify changes
     console.log(chalk.yellow('\n🔍 Step 5: Verifying Changes'));
-    await executeSql('SELECT COUNT(*) as count FROM recently_played;');
+    
+    // Get updated list of tables to verify changes
+    const { stdout: updatedTablesOutput } = await execAsync('psql -d spotify_clone -c "\\dt"');
+    const updatedTables: string[] = [];
+    const lines = updatedTablesOutput.split('\n');
+    for (const line of lines) {
+      const match = line.match(/\|\s+(\w+)\s+\|/);
+      if (match && match[1] && !match[1].includes('_seq')) {
+        updatedTables.push(match[1]);
+      }
+    }
+    
+    // Verify data in relevant tables
+    for (const table of updatedTables) {
+      if (table.includes('recently') || table.includes('made') || table.includes('popular')) {
+        try {
+          const { stdout: countResult } = await execAsync(`psql -d spotify_clone -c "SELECT COUNT(*) as count FROM "${table}";"`);
+          console.log(chalk.green(`✅ Table ${table} has data: ${countResult.trim()}`));
+        } catch (error) {
+          console.log(chalk.yellow(`⚠️ Could not verify table ${table}`));
+        }
+      }
+    }
     
     console.log(chalk.green('\n✅ Query processing completed successfully!'));
 
