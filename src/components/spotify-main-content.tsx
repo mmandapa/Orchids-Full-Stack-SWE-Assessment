@@ -91,7 +91,10 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true)
+        // Only set loading to true on initial load, not on refreshes
+        if (loading) {
+          setLoading(true)
+        }
         
         // Get all available tables
         const tablesResponse = await fetch('/api/db/tables')
@@ -511,9 +514,8 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
     
     fetchData()
     
-    // Refresh data every 5 seconds
-    const interval = setInterval(fetchData, 5000)
-    return () => clearInterval(interval)
+    // Remove the 5-second interval that was causing flickering
+    // Data will only be fetched on component mount
   }, [])
 
   // Always render all three sections, using fallback if empty
