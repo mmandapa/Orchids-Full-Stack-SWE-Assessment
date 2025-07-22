@@ -48,11 +48,12 @@ function displayLogo() {
   console.log(chalk.blue.bold('Database Agent'));
   console.log(chalk.dim('AI-powered database operations for Spotify clone'));
   console.log(chalk.dim('─'.repeat(80)));
-  console.log(chalk.yellow('Keyboard shortcuts:'));
-  console.log(chalk.dim('  Arrow keys: Navigate options'));
+  console.log(chalk.yellow('🎯 Quick Actions:'));
+  console.log(chalk.dim('  ↑/↓: Navigate options'));
   console.log(chalk.dim('  Type: Search options'));
   console.log(chalk.dim('  Enter: Select option'));
   console.log(chalk.dim('  Ctrl+C: Exit anytime'));
+  console.log(chalk.dim('  Tab: Auto-complete'));
   console.log(chalk.dim('─'.repeat(80)));
   console.log('');
 }
@@ -185,32 +186,32 @@ function showAvailableCommands() {
 async function createInteractiveMenu() {
   const choices = [
     {
-      name: 'List all database tables',
+      name: '🔍 List all database tables',
       value: 'tables',
       description: 'Show all available tables in the database'
     },
     {
-      name: 'View table data',
+      name: '📊 View table data',
       value: 'view',
       description: 'Display data from a specific table'
     },
     {
-      name: 'Process AI query',
+      name: '🤖 Process AI query',
       value: 'query',
       description: 'Ask AI to perform database operations'
     },
     {
-      name: 'Reset database (wipe all data)',
+      name: '🔄 Reset database (wipe all data)',
       value: 'reset',
       description: 'Drop all tables and restore UI to original form'
     },
     {
-      name: 'Show help',
+      name: '📚 Show help & examples',
       value: 'help',
       description: 'Display detailed help and examples'
     },
     {
-      name: 'Exit (Ctrl+C)',
+      name: '🚪 Exit (Ctrl+C)',
       value: 'exit',
       description: 'Close the application'
     }
@@ -220,9 +221,10 @@ async function createInteractiveMenu() {
     {
       type: 'list',
       name: 'action',
-      message: 'What would you like to do? (Use arrow keys or type to search)',
+      message: chalk.blue.bold('What would you like to do?'),
       choices: choices,
-      pageSize: 10
+      pageSize: 10,
+      loop: false
     }
   ]);
 
@@ -242,11 +244,13 @@ async function selectTable(): Promise<string> {
     {
       type: 'list',
       name: 'selectedTable',
-      message: 'Select a table to view:',
+      message: chalk.blue.bold('Select a table to view:'),
       choices: tables.map(table => ({
-        name: table,
+        name: `📋 ${table}`,
         value: table
-      }))
+      })),
+      pageSize: 10,
+      loop: false
     }
   ]);
 
@@ -255,11 +259,18 @@ async function selectTable(): Promise<string> {
 
 // Function to get query input
 async function getQueryInput(): Promise<string> {
-  const { query } = await inquirer.prompt([
+  console.log(chalk.blue.bold('💡 Query Examples:'));
+  console.log(chalk.dim('  • "Can you store the recently played songs in a table"'));
+  console.log(chalk.dim('  • "Can you store the Made for you and Popular albums in a table"'));
+  console.log(chalk.dim('  • "Add some new songs to the recently played table"'));
+  console.log(chalk.dim('  • "Create a backup of all tables"'));
+  console.log(chalk.dim('─'.repeat(60)));
+  
+      const { query } = await inquirer.prompt([
     {
       type: 'input',
       name: 'query',
-      message: 'Enter your database query:',
+      message: chalk.blue.bold('🤖 Enter your database query:'),
       validate: (input: string) => {
         if (input.trim().length === 0) {
           return 'Please enter a query';
@@ -278,7 +289,7 @@ async function getTableLimit(): Promise<number> {
     {
       type: 'number',
       name: 'limit',
-      message: 'How many rows to display?',
+      message: chalk.blue.bold('📊 How many rows to display?'),
       default: 10,
       validate: (input: any) => {
         const num = Number(input);
@@ -303,20 +314,20 @@ async function runInteractiveMode() {
       
       switch (action) {
         case 'tables':
-          console.log(chalk.blue('Available Database Tables:'));
-          console.log(chalk.dim('─'.repeat(50)));
+          console.log(chalk.blue.bold('📋 Available Database Tables:'));
+          console.log(chalk.dim('─'.repeat(60)));
           
           const tables = await getAllTables();
           
           if (tables.length === 0) {
-            console.log(chalk.yellow('No tables found or database connection failed'));
+            console.log(chalk.yellow('⚠️ No tables found or database connection failed'));
           } else {
             tables.forEach((table, index) => {
-              console.log(chalk.green(`${index + 1}. ${table}`));
+              console.log(chalk.green(`  ${index + 1}. ${table}`));
             });
             
-            console.log(chalk.dim('─'.repeat(50)));
-            console.log(chalk.blue(`Total tables: ${tables.length}`));
+            console.log(chalk.dim('─'.repeat(60)));
+            console.log(chalk.blue.bold(`📊 Total tables: ${tables.length}`));
           }
           break;
           
@@ -330,11 +341,12 @@ async function runInteractiveMode() {
           
         case 'query':
           const query = await getQueryInput();
-          console.log(chalk.blue('Database Agent: Processing your query...'));
+          console.log(chalk.blue.bold('🤖 Database Agent: Processing your query...'));
           console.log(chalk.dim(`Query: ${query}`));
+          console.log(chalk.dim('─'.repeat(60)));
           
           await processQuery(query, openai);
-          console.log(chalk.green('Query processing completed!'));
+          console.log(chalk.green.bold('✅ Query processing completed!'));
           break;
           
         case 'reset':
@@ -342,13 +354,13 @@ async function runInteractiveMode() {
           break;
           
         case 'help':
-          console.log(chalk.blue('Database Agent - Help'));
-          console.log(chalk.dim('─'.repeat(50)));
+          console.log(chalk.blue.bold('📚 Database Agent - Help & Examples'));
+          console.log(chalk.dim('─'.repeat(60)));
           
           showAvailableCommands();
           
-          console.log(chalk.blue('Common Use Cases:'));
-          console.log(chalk.dim('─'.repeat(50)));
+          console.log(chalk.blue.bold('💡 Common Use Cases:'));
+          console.log(chalk.dim('─'.repeat(60)));
           
           const useCases = [
             {
@@ -374,7 +386,7 @@ async function runInteractiveMode() {
           ];
           
           useCases.forEach((useCase, index) => {
-            console.log(chalk.yellow(`${index + 1}. ${useCase.scenario}`));
+            console.log(chalk.yellow.bold(`${index + 1}. ${useCase.scenario}`));
             console.log(chalk.green(`   Command: ${useCase.command}`));
             console.log(chalk.dim(`   ${useCase.description}`));
             console.log('');
@@ -382,7 +394,7 @@ async function runInteractiveMode() {
           break;
           
         case 'exit':
-          console.log(chalk.blue('Goodbye!'));
+          console.log(chalk.blue.bold('👋 Goodbye! Thanks for using DB-Agent!'));
           process.exit(0);
           break;
       }
@@ -394,7 +406,7 @@ async function runInteractiveMode() {
           input: process.stdin,
           output: process.stdout
         });
-        rl.question('', () => {
+        rl.question(chalk.blue('⏎ '), () => {
           rl.close();
           resolve(undefined);
         });
