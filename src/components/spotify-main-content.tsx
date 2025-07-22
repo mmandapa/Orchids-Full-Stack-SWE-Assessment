@@ -731,11 +731,11 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
     }
 
     // Show empty state when no database data
-    return (
-      <div className="text-center py-8">
-        <p className="text-gray-400">No recently played songs found. Database needs to be populated.</p>
-      </div>
-    );
+                            return (
+                          <div className="text-center py-8">
+                            <p className="text-gray-400">No recently played songs found.</p>
+                          </div>
+                        );
   };
 
   // Render made for you playlists
@@ -780,11 +780,11 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
     }
 
     // Show empty state when no database data
-    return (
-      <div className="text-center py-8">
-        <p className="text-gray-400">No made for you playlists found. Database needs to be populated.</p>
-      </div>
-    );
+                            return (
+                          <div className="text-center py-8">
+                            <p className="text-gray-400">No made for you playlists found.</p>
+                          </div>
+                        );
   };
 
   // Render popular albums
@@ -836,11 +836,11 @@ export default function SpotifyMainContent({ onPlayTrack }: SpotifyMainContentPr
     }
 
     // Show empty state when no database data
-    return (
-      <div className="text-center py-8">
-        <p className="text-gray-400">No popular albums found. Database needs to be populated.</p>
-      </div>
-    );
+                            return (
+                          <div className="text-center py-8">
+                            <p className="text-gray-400">No popular albums found.</p>
+                          </div>
+                        );
   };
 
   if (loading) {
